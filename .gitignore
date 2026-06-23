@@ -1,0 +1,46 @@
+/.phpunit.cache
+/node_modules
+/public/build
+/public/hot
+/public/storage
+
+/vendor
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+
+/storage/*.key
+/storage/pail
+/storage/logs/*.log
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*.php
+/storage/dotenv-editor/backups/*.env
+/storage/dotenv-editor/backups/*.json
+
+
+DEVELOPMENT_MANUAL.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Server/host artifacts
+.ftpquota
+php.ini
+.user.ini
+
+# Database dumps
+*.sql

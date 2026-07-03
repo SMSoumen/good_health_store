@@ -202,6 +202,16 @@
                 </a>
             </li>
 
+            <li class="sidebar-title ms-3"><i class='bx bx-purchase-tag'></i>
+                {{ labels('admin_labels.stickers', 'Stickers') }}
+            </li>
+            <li class="nav-item ms-3">
+                <a class="nav-link {{ Request::is('admin/stickers') || Request::is('admin/stickers/*') ? 'active' : '' }}"
+                    href="{{ route('stickers.index') }}">
+                    <span class="nav-link-text ms-1">{{ labels('admin_labels.stickers', 'Stickers') }}</span>
+                </a>
+            </li>
+
             <li class="sidebar-title ms-3"><i class='bx bx-card'></i>
                 {{ labels('admin_labels.sellers', 'Sellers') }}
             </li>
@@ -579,6 +589,39 @@
                 <a class="nav-link {{ Request::is('admin/faq') || Request::is('admin/faq/*') ? 'active' : '' }}"
                     href="{{ route('faqs.index') }}">
                     <span class="nav-link-text ms-1">{{ labels('admin_labels.faqs', 'FAQs') }}</span>
+                </a>
+            </li>
+
+            <li class="sidebar-title ms-3"><i class='bx bx-envelope'></i>{{ labels('admin_labels.newsletter', 'Newsletter') }}
+            </li>
+            <li class="nav-item ms-3">
+                <a class="nav-link {{ Request::is('admin/newsletter') || Request::is('admin/newsletter/*') ? 'active' : '' }}"
+                    href="{{ route('admin.newsletter.index') }}">
+                    <span class="nav-link-text ms-1">{{ labels('admin_labels.subscribers', 'Subscribers') }}</span>
+                </a>
+            </li>
+
+            <li class="sidebar-title ms-3"><i class='bx bx-gift'></i>{{ labels('admin_labels.bulk_gifting', 'Bulk Gifting') }}
+            </li>
+            <li class="nav-item ms-3">
+                <a class="nav-link {{ Request::is('admin/bulk-gifting-inquiries') || Request::is('admin/bulk-gifting-inquiries/*') ? 'active' : '' }}"
+                    href="{{ route('admin.bulk_gifting_inquiries.index') }}">
+                    <span class="nav-link-text ms-1">{{ labels('admin_labels.inquiries', 'Inquiries') }}</span>
+                </a>
+            </li>
+
+            <li class="sidebar-title ms-3"><i class='bx bx-star'></i>{{ labels('admin_labels.reviews', 'Reviews') }}
+            </li>
+            <li class="nav-item ms-3">
+                <a class="nav-link {{ Request::is('admin/reviews') || Request::is('admin/reviews/*') ? 'active' : '' }}"
+                    href="{{ route('admin.reviews.index') }}">
+                    <span class="nav-link-text ms-1">{{ labels('admin_labels.product_reviews', 'Product Reviews') }}</span>
+                </a>
+            </li>
+            <li class="nav-item ms-3">
+                <a class="nav-link {{ Request::is('admin/combo_reviews') || Request::is('admin/combo_reviews/*') ? 'active' : '' }}"
+                    href="{{ route('admin.combo_reviews.index') }}">
+                    <span class="nav-link-text ms-1">{{ labels('admin_labels.combo_product_reviews', 'Combo Reviews') }}</span>
                 </a>
             </li>
 

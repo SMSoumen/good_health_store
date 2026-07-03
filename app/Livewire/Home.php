@@ -9,6 +9,7 @@ use App\Models\Brand;
 use App\Models\Category;
 use App\Models\CategorySliders;
 use App\Models\Offer;
+use App\Models\ProductRating;
 use App\Models\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -47,6 +48,8 @@ class Home extends Component
 
         $categories_section = $this->getCategoriesSection();
         $sections = $this->sections();
+        $best_sellers = $this->bestSellers();
+        $wellness_bundles = $this->wellnessBundles();
         $offers = $this->getOffers($store_id);
         $settings = app(SettingService::class)->getSettings('web_settings', true);
         $settings = json_decode($settings);
@@ -74,10 +77,13 @@ class Home extends Component
             'sections' => $sections,
             'offers' => $offers,
             'categories_section' => $categories_section,
+            'best_sellers' => $best_sellers,
+            'wellness_bundles' => $wellness_bundles,
             'settings' => $settings,
             'ratings' => $ratings,
             'blogs' => $blogs,
             'blogs_count' => $blogs_count,
+            'ghs_testimonials' => $this->ghsTestimonials(),
         ])->layoutData([
             'title' => "Home |",
             'structuredData' => $websiteData . "\n" . $orgData
@@ -184,6 +190,91 @@ class Home extends Component
             }
         }
         return $sections;
+    }
+
+    /**
+     * Best-selling regular products for the GHS home "Best Sellers" grid.
+     * Sorted by total sales via the ProductService "most_selling_products" filter.
+     */
+    public function bestSellers($limit = 4)
+    {
+        $store_id = session('store_id');
+        $filters = [
+            'show_only_active_products' => true,
+            'product_type' => 'most_selling_products',
+        ];
+        $products = app(ProductService::class)->fetchProduct(
+            user_id: $this->user_id,
+            filter: $filters,
+            limit: $limit,
+            store_id: $store_id,
+            is_detailed_data: 0,
+        );
+        return $products['product'] ?? [];
+    }
+
+    /**
+     * Combo products for the GHS home "Wellness Bundles" grid.
+     * Returns the store's active combos (newest first).
+     */
+    public function wellnessBundles($limit = 6)
+    {
+        $store_id = session('store_id');
+        $filters = [
+            'show_only_active_products' => true,
+        ];
+        $combos = app(ComboProductService::class)->fetchComboProduct(
+            user_id: $this->user_id,
+            filter: $filters,
+            limit: $limit,
+            store_id: $store_id,
+        );
+        return $combos['combo_product'] ?? [];
+    }
+
+    /**
+     * Build the GHS home "Heart of Kashmir" testimonial list: the highest-rated
+     * admin-approved real reviews (4-5 stars, with a comment) come first, then the
+     * curated/seed testimonials fill the remaining slots, capped at 8 total.
+     */
+    public function ghsTestimonials()
+    {
+        // Real, admin-approved high-rated reviews with a written comment.
+        $real = ProductRating::with('user:id,username,image')
+            ->where('status', 1)
+            ->where('rating', '>=', 4)
+            ->whereNotNull('comment')
+            ->where('comment', '!=', '')
+            ->orderBy('rating', 'desc')
+            ->orderBy('id', 'desc')
+            ->limit(8)
+            ->get()
+            ->map(function ($r) {
+                $avatar = (!empty($r->user->image) && file_exists(public_path(config('constants.USER_IMG_PATH') . $r->user->image)))
+                    ? app(MediaService::class)->getMediaImageUrl($r->user->image, 'USER_IMG_PATH')
+                    : app(MediaService::class)->getImageUrl('no-user-img.jpeg', '', '', 'image', 'NO_USER_IMAGE');
+
+                return [
+                    'name' => $r->user->username ?? labels('front_messages.customer', 'Customer'),
+                    'avatar' => $avatar,
+                    'text' => $r->comment,
+                    'rating' => (int) round($r->rating),
+                ];
+            })
+            ->toArray();
+
+        // Curated/seed testimonials. Each is shown with a random 4- or 5-star rating.
+        $fake = [
+            ['name' => 'Aarav Sharma', 'avatar' => asset('frontend/ghs/images/testimonial-1.jpg'), 'text' => labels('front_messages.testimonial_1', 'Amazing quality saffron! It truly enhances the flavor and aroma of my dishes.'), 'rating' => rand(4, 5)],
+            ['name' => 'Priya Nair', 'avatar' => asset('frontend/ghs/images/testimonial-2.jpg'), 'text' => labels('front_messages.testimonial_2', 'The honey is so pure and natural. You can taste the difference instantly.'), 'rating' => rand(4, 5)],
+            ['name' => 'Rohan Mehta', 'avatar' => asset('frontend/ghs/images/testimonial-3.jpg'), 'text' => labels('front_messages.testimonial_3', 'Authentic products delivered right to my doorstep. Highly recommended!'), 'rating' => rand(4, 5)],
+            ['name' => 'Sneha Kapoor', 'avatar' => asset('frontend/ghs/images/testimonial-4.jpg'), 'text' => labels('front_messages.testimonial_4', 'Fresh, flavourful and packed with care. A taste of Kashmir at home.'), 'rating' => rand(4, 5)],
+            ['name' => 'Vikram Singh', 'avatar' => asset('frontend/ghs/images/testimonial-5.jpg'), 'text' => labels('front_messages.testimonial_5', 'Wonderful dry fruits, perfectly fresh. My family loves them.'), 'rating' => rand(4, 5)],
+            ['name' => 'Ananya Reddy', 'avatar' => asset('frontend/ghs/images/testimonial-6.jpg'), 'text' => labels('front_messages.testimonial_6', 'Trustworthy brand with genuine, high-quality Kashmiri produce.'), 'rating' => rand(4, 5)],
+        ];
+
+        // Real reviews first, then top up with seed testimonials, max 8.
+        return array_slice(array_merge($real, $fake), 0, 8);
     }
 
     public function sendMailTemplate($to, $template_key, $data = ['username' => 'jay', 'appname' => 'Ezeemart'], $givenLanguage = "")

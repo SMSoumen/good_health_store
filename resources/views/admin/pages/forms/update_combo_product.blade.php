@@ -1233,6 +1233,9 @@
                         </div>
                     </div>
                 </div>
+                <x-key-features-form :features="$data->keyFeatures" />
+                <x-stickers-select :selected="$data->stickers->pluck('id')->all()" />
+                <x-product-sections-form :sections="$data->sections" />
                 <div class="float-end ml-2 mt-xxl-3 mt-7 text-center">
                     <button type="submit"
                         class="btn btn-primary submit_button">{{ labels('admin_labels.submit', 'Submit') }}</button>

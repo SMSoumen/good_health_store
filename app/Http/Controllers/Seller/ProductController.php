@@ -471,6 +471,11 @@ class ProductController extends Controller
 
         $product = Product::create($product_data);
 
+        // Store Key Features rows
+        saveKeyFeatures(\App\Models\ProductKeyFeature::class, $product->id, $request->input('key_features', []));
+        syncStickers('product_sticker', 'product_id', $product->id, $request->input('stickers', []));
+        saveProductSections(\App\Models\ProductSection::class, $product->id, $request->input('sections', []));
+
 
         if ($request->has('custom_fields')) {
             foreach ($request->custom_fields as $fieldId => $fieldArray) {
@@ -1394,6 +1399,11 @@ class ProductController extends Controller
             $product_data['other_images'] = json_encode($request->other_images, 1);
 
             $product = Product::where('id', $data)->update($product_data);
+
+            // Store Key Features rows
+            saveKeyFeatures(\App\Models\ProductKeyFeature::class, $data, $request->input('key_features', []));
+            syncStickers('product_sticker', 'product_id', $data, $request->input('stickers', []));
+            saveProductSections(\App\Models\ProductSection::class, $data, $request->input('sections', []));
 
 
             // Step 4: Insert/Update new or existing fields
@@ -2485,7 +2495,8 @@ class ProductController extends Controller
             $categories = Category::where('status', 1)->where('store_id', $store_id)->orderBy('id', 'desc')->get();
 
 
-            $rating = app(ProductService::class)->fetchRating($id, '', 8, 0, '', 'desc', '', 1);
+            // Sellers see all reviews on their own products (including pending), so don't gate by status.
+            $rating = app(ProductService::class)->fetchRating($id, '', 8, 0, '', 'desc', '', 1, false, '', false);
 
 
 
@@ -2836,5 +2847,63 @@ class ProductController extends Controller
         ]);
 
         return response()->json(['error' => false, 'message' => 'Pickup locations updated successfully!']);
+    }
+
+    public function change_variant_status(Request $request)
+    {
+        $status = $request->status;
+        $id = $request->id;
+
+        if (empty($id) || !in_array($status, [0, 1])) {
+            return response()->json([
+                'error' => true,
+                'error_message' => labels('admin_labels.invalid_status_or_id_value', 'Invalid Status or ID value supplied')
+            ]);
+        }
+
+        // Only allow acting on a variant that belongs to one of this seller's products
+        $variant = Product_variants::join('products', 'product_variants.product_id', '=', 'products.id')
+            ->where('product_variants.id', $id)
+            ->where('products.seller_id', Auth::user()->id)
+            ->select('product_variants.id')
+            ->first();
+
+        if (!$variant) {
+            return response()->json([
+                'error' => true,
+                'error_message' => labels('admin_labels.invalid_status_or_id_value', 'Invalid Status or ID value supplied')
+            ]);
+        }
+
+        $newStatus = $status == 1 ? 0 : 1;
+        Product_variants::where('id', $id)->update(['status' => $newStatus]);
+
+        return response()->json(['error' => false, 'message' => labels('admin_labels.status_updated_successfully', 'Status updated successfully.')]);
+    }
+
+    public function delete_variant(Request $request)
+    {
+        $status = $request->status;
+        $id = $request->id;
+
+        if (empty($id) || !in_array($status, [0, 1, 7])) {
+            return response()->json(['error' => true, 'error_message' => labels('admin_labels.invalid_status_or_id_value', 'Invalid Status or ID value supplied')]);
+        }
+
+        // Only allow acting on a variant that belongs to one of this seller's products
+        $variant = Product_variants::join('products', 'product_variants.product_id', '=', 'products.id')
+            ->where('product_variants.id', $id)
+            ->where('products.seller_id', Auth::user()->id)
+            ->select('product_variants.id')
+            ->first();
+
+        if (!$variant) {
+            return response()->json(['error' => true, 'error_message' => labels('admin_labels.invalid_status_or_id_value', 'Invalid Status or ID value supplied')]);
+        }
+
+        $newStatus = $status == 7 ? 1 : ($status == 1 ? 7 : $status);
+        Product_variants::where('id', $id)->update(['status' => $newStatus]);
+
+        return response()->json(['error' => false, 'message' => labels('admin_labels.status_updated_successfully', 'Status updated successfully.')]);
     }
 }

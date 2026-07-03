@@ -6317,7 +6317,7 @@ Defined Methods:-
 
         $files = ($request->allFiles());
         $response = $ProductRatingController->set_rating($request, $files);
-        $rating_data = $ProductRatingController->fetch_rating(($request->input('product_id') != null) ? $request->input('product_id') : '', '', '25', '0', 'id', 'DESC', '', '', '', 'true');
+        $rating_data = $ProductRatingController->fetch_rating(($request->input('product_id') != null) ? $request->input('product_id') : '', '', '25', '0', 'id', 'DESC', '', '', '', 'true', 1);
 
         $rating['product_rating'] = $rating_data['product_rating'];
 
@@ -6371,7 +6371,8 @@ Defined Methods:-
             '',
             $has_images,
             '',
-            true
+            true,
+            1 // only return admin-approved reviews
         );
         //dd($rating);
 
@@ -7104,7 +7105,7 @@ Defined Methods:-
         $files = ($request->allFiles());
 
         $response = $ComboProductRatingController->set_rating($request, $files);
-        $rating_data = $ComboProductRatingController->fetch_rating(($request->input('product_id') != null) ? $request->input('product_id') : '', '', '25', '0', 'id', 'DESC');
+        $rating_data = $ComboProductRatingController->fetch_rating(($request->input('product_id') != null) ? $request->input('product_id') : '', '', '25', '0', 'id', 'DESC', '', '', '', false, 1);
 
         $rating['product_rating'] = $rating_data['product_rating'];
 
@@ -7144,7 +7145,7 @@ Defined Methods:-
         $pr_rating = fetchDetails(ComboProduct::class, ['id' => $product_id], 'rating');
 
         $rating = $request->input('rating') != null ? $request->input('rating') : '';
-        $rating = $ProductRatingController->fetch_rating(($request->input('product_id') != null) ? $request->input('product_id') : '', $user_id, $limit, $offset, $sort, $order, '', $has_images, $rating, 'true');
+        $rating = $ProductRatingController->fetch_rating(($request->input('product_id') != null) ? $request->input('product_id') : '', $user_id, $limit, $offset, $sort, $order, '', $has_images, $rating, 'true', 1);
 
         if (!empty($rating['product_rating'])) {
             $response['error'] = false;

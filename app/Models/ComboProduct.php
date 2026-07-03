@@ -138,7 +138,19 @@ class ComboProduct extends Model
     }
     public function ratings()
     {
-        return $this->hasMany(ComboProductRating::class, 'product_id'); 
+        return $this->hasMany(ComboProductRating::class, 'product_id');
+    }
+    public function keyFeatures()
+    {
+        return $this->hasMany(ComboProductKeyFeature::class, 'product_id')->orderBy('row_order')->orderBy('id');
+    }
+    public function stickers()
+    {
+        return $this->belongsToMany(Sticker::class, 'combo_product_sticker', 'combo_product_id', 'sticker_id');
+    }
+    public function sections()
+    {
+        return $this->hasMany(ComboProductSection::class, 'product_id')->orderBy('row_order')->orderBy('id');
     }
 
     public function getTaxPercentages()

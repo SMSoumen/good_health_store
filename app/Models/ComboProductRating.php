@@ -15,8 +15,10 @@ class ComboProductRating extends Model
         'user_id',
         'product_id',
         'rating',
+        'status',
         'images',
         'comment',
+        'title',
     ];
 
     public function user()

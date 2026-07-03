@@ -78,6 +78,12 @@
                 </a>
             </li>
             <li class="nav-item ">
+                <a class="nav-link {{ Request::is('seller/stickers') || Request::is('seller/stickers/*') ? 'active' : '' }}"
+                    href="{{ route('seller.stickers.index') }}">
+                    <span class="nav-link-text ">{{ labels('admin_labels.stickers', 'Stickers') }}</span>
+                </a>
+            </li>
+            <li class="nav-item ">
                 <a class="nav-link {{ Request::is('seller/point_of_sale') || Request::is('seller/point_of_sale/*') ? 'active' : '' }}"
                     href="{{ route('seller.point_of_sale.index') }}">
                     <span class="nav-link-text ">{{ labels('admin_labels.point_of_sale', 'Point Of Sale') }}</span>

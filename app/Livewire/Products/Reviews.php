@@ -18,7 +18,8 @@ class Reviews extends Component
 
     public function render()
     {
-        $reviews = fetchDetails(ProductRating::class, ['product_id' => $this->product_id]);
+        // Only admin-approved reviews are published publicly.
+        $reviews = fetchDetails(ProductRating::class, ['product_id' => $this->product_id, 'status' => 1]);
         foreach ($reviews as $key => $ratings) {
             $user_profile = fetchDetails(User::class, ['id' => $ratings->user_id], ['image', 'username']);
             $reviews[$key]->user_profile = $user_profile[$key]->image ?? "frontend/elegant/user-profile-icon.jpg";

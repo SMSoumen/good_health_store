@@ -1210,6 +1210,9 @@
             </div>
         </div>
     </div>
+    <x-key-features-form />
+    <x-stickers-select />
+    <x-product-sections-form />
     <div class="float-end ml-2 mt-xxl-3 mt-7 text-center">
         <button type="submit" id="submit_btn"
             class="btn btn-primary submit_button">{{ labels('admin_labels.submit', 'Submit') }}</button>

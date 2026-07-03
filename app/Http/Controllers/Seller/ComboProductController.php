@@ -257,6 +257,11 @@ class ComboProductController extends Controller
         // --- Create Combo Product ---
         $product = ComboProduct::create($product_data);
 
+        // Store Key Features rows
+        saveKeyFeatures(\App\Models\ComboProductKeyFeature::class, $product->id, $request->input('key_features', []));
+        syncStickers('combo_product_sticker', 'combo_product_id', $product->id, $request->input('stickers', []));
+        saveProductSections(\App\Models\ComboProductSection::class, $product->id, $request->input('sections', []));
+
         // --- Custom Fields Save Logic ---
         if ($request->has('custom_fields')) {
             foreach ($request->custom_fields as $fieldId => $fieldArray) {
@@ -567,6 +572,11 @@ class ComboProductController extends Controller
 
         // --- Execute Update ---
         $product = ComboProduct::where('id', $data)->update($product_data_update);
+
+        // Store Key Features rows
+        saveKeyFeatures(\App\Models\ComboProductKeyFeature::class, $data, $request->input('key_features', []));
+        syncStickers('combo_product_sticker', 'combo_product_id', $data, $request->input('stickers', []));
+        saveProductSections(\App\Models\ComboProductSection::class, $data, $request->input('sections', []));
 
         // --- Custom Fields Save Logic ---
         if ($request->has('custom_fields')) {
@@ -967,7 +977,8 @@ class ComboProductController extends Controller
 
             $product_faqs = app(ComboProductService::class)->getComboProductFaqs('', $data->id);
 
-            $rating = app(ComboProductService::class)->fetchComboRating($id, '', 8, 0, '', 'desc', '', 1);
+            // Sellers see all reviews on their own combo products (including pending), so don't gate by status.
+            $rating = app(ComboProductService::class)->fetchComboRating($id, '', 8, 0, '', 'desc', '', 1, false);
 
 
 

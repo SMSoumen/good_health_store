@@ -2686,7 +2686,8 @@ class ApiController extends Controller
             }
             $rating = $request->input('rating') != null ? $request->input('rating') : '';
             $pr_rating = fetchDetails(Product::class, ['id' => $product_id], 'rating');
-            $rating = app(ProductService::class)->fetchRating($product_id, $user_id, $limit, $offset, $sort, $order, '', $has_images, 'true', $rating);
+            // Sellers see all reviews on their own products (including pending), so don't gate by status.
+            $rating = app(ProductService::class)->fetchRating($product_id, $user_id, $limit, $offset, $sort, $order, '', $has_images, 'true', $rating, false);
             if (!empty($rating['product_rating'])) {
                 $response['error'] = false;
                 $response['message'] = 'Rating retrieved successfully';

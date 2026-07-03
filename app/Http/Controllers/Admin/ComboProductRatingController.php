@@ -51,6 +51,10 @@ class ComboProductRatingController extends Controller
         }
         $rating['images'] = isset($uploadedImages) && !empty($uploadedImages) ? json_encode($uploadedImages) : '';
 
+        // Every newly submitted or edited review re-enters moderation as pending
+        // (0 = pending). It stays unpublished until an admin approves it.
+        $rating['status'] = 0;
+
         $existing_rating = ComboProductRating::where('user_id', $data['user_id'])
             ->where('product_id', $data['product_id'])
             ->first();
@@ -61,31 +65,44 @@ class ComboProductRatingController extends Controller
             ComboProductRating::create($rating);
         }
 
-        if (isset($data['rating']) && !empty($data['rating'])) {
-            // Update product rating
-            $product = ComboProduct::find($data['product_id']);
-            $ratings = ComboProductRating::where('product_id', $data['product_id'])->count();
-            $total_rating = ComboProductRating::where('product_id', $data['product_id'])->sum('rating');
-            $new_rating = ($ratings > 0) ? round($total_rating / $ratings, 1, PHP_ROUND_HALF_UP) : 0;
-            $product->update(['rating' => $new_rating, 'no_of_ratings' => $ratings]);
+        // Recompute aggregates from approved reviews only. A freshly saved pending
+        // review therefore does not affect the combo/seller rating until approved.
+        $this->recalculateAggregates($data['product_id']);
 
-            // Update seller rating
-            $store_id = $product->store_id;
-            $seller_id = $product->seller_id;
-            $seller_ratings = ComboProduct::where('seller_id', $seller_id)->where('rating', '>', 0)->count();
+        return true;
+    }
 
-            $seller_total_rating = ComboProduct::where('seller_id', $seller_id)->sum('rating');
-            $seller_new_rating = ($seller_ratings > 0) ? round($seller_total_rating / $seller_ratings, 1, PHP_ROUND_HALF_UP) : 0;
+    /**
+     * Recalculate a combo product's stored average rating / count and its seller's
+     * aggregate rating, counting APPROVED reviews (status = 1) only.
+     */
+    public function recalculateAggregates($product_id)
+    {
+        $product = ComboProduct::find($product_id);
 
-            $seller = Seller::find($seller_id);
-            // dd($seller);
-            // dd($seller_new_rating);
+        if (!$product) {
+            return;
+        }
+
+        $ratings = ComboProductRating::where('product_id', $product_id)->where('status', 1)->count();
+        $total_rating = ComboProductRating::where('product_id', $product_id)->where('status', 1)->sum('rating');
+        $new_rating = ($ratings > 0) ? round($total_rating / $ratings, 1, PHP_ROUND_HALF_UP) : 0;
+        $product->update(['rating' => $new_rating, 'no_of_ratings' => $ratings]);
+
+        // Update seller rating (scoped to the combo product's store pivot).
+        $store_id = $product->store_id;
+        $seller_id = $product->seller_id;
+        $seller_ratings = ComboProduct::where('seller_id', $seller_id)->where('rating', '>', 0)->count();
+        $seller_total_rating = ComboProduct::where('seller_id', $seller_id)->sum('rating');
+        $seller_new_rating = ($seller_ratings > 0) ? round($seller_total_rating / $seller_ratings, 1, PHP_ROUND_HALF_UP) : 0;
+
+        $seller = Seller::find($seller_id);
+        if ($seller) {
             $seller->stores()->updateExistingPivot($store_id, [
                 'rating' => $seller_new_rating,
                 'no_of_ratings' => $seller_ratings
             ]);
         }
-        return true;
     }
 
 
@@ -96,7 +113,7 @@ class ComboProductRatingController extends Controller
         return $image;
     }
 
-    public function fetch_rating($product_id = '', $user_id = '', $limit = '', $offset = '', $sort = 'id', $order = 'desc', $rating_id = '', $has_images = '', $rating = '', $count_empty_comments = false)
+    public function fetch_rating($product_id = '', $user_id = '', $limit = '', $offset = '', $sort = 'id', $order = 'desc', $rating_id = '', $has_images = '', $rating = '', $count_empty_comments = false, $status = '')
     {
         // Fetch product ratings with user data
         $query = ComboProductRating::with(['user:id,username,image'])
@@ -104,6 +121,7 @@ class ComboProductRatingController extends Controller
             ->when($user_id, fn($q) => $q->where('user_id', $user_id))
             ->when($rating_id, fn($q) => $q->where('id', $rating_id))
             ->when($rating, fn($q) => $q->where('rating', $rating))
+            ->when($status !== '' && $status !== null, fn($q) => $q->where('status', $status))
             ->when($has_images == 1, fn($q) => $q->whereNotNull('images'))
             ->when($sort && $order, fn($q) => $q->orderBy($sort, $order))
             ->skip($offset)
@@ -132,11 +150,15 @@ class ComboProductRatingController extends Controller
         // Aggregates
         $res = [];
 
+        // Aggregate stats follow the same status scope as the list (e.g. mobile API
+        // passes status = 1 so counts reflect published reviews only).
+        $statusScope = fn($q) => ($status !== '' && $status !== null) ? $q->where('status', $status) : $q;
+
         // Total number of ratings
-        $res['no_of_rating'] = ComboProductRating::where('product_id', $product_id)->count();
+        $res['no_of_rating'] = ComboProductRating::where('product_id', $product_id)->where($statusScope)->count();
 
         // Total reviews with images
-        $res['total_images'] = (string) ComboProductRating::where('product_id', $product_id)
+        $res['total_images'] = (string) ComboProductRating::where('product_id', $product_id)->where($statusScope)
             ->whereNotNull('images')
             ->get()
             ->sum(function ($item) {
@@ -154,6 +176,7 @@ class ComboProductRatingController extends Controller
                 sum(case when CEILING(rating) = 5 then 1 else 0 end) as rating_5
         ')
             ->where('product_id', $product_id)
+            ->where($statusScope)
             ->first();
 
         $res['total_reviews'] = $star_counts->total ?? 0;
@@ -165,7 +188,7 @@ class ComboProductRatingController extends Controller
 
         // Reviews with non-empty comments
         $res['no_of_reviews'] = $count_empty_comments
-            ? ComboProductRating::where('product_id', $product_id)
+            ? ComboProductRating::where('product_id', $product_id)->where($statusScope)
             ->whereNotNull('comment')
             ->where('comment', '!=', '')
             ->count()
@@ -193,35 +216,13 @@ class ComboProductRatingController extends Controller
                 }
             }
 
+            $product_id = $rating_details->product_id;
+
             $rating_details->delete();
 
-            $product = ComboProduct::find($rating_details->product_id);
+            // Recompute combo + seller aggregates from approved reviews only.
+            $this->recalculateAggregates($product_id);
 
-            if ($product) {
-                $combo_product_ratings = ComboProductRating::selectRaw('count(rating) as no_of_ratings, sum(rating) as sum_of_rating')
-                    ->where('product_id', $product->id)
-                    ->first();
-
-                $no_of_rating = $combo_product_ratings->no_of_ratings;
-                $total_rating = $combo_product_ratings->sum_of_rating;
-
-                $newrating = ($no_of_rating > 0) ? round($total_rating / $no_of_rating, 1, PHP_ROUND_HALF_UP) : 0;
-
-                $product->update(['rating' => $newrating, 'no_of_ratings' => $no_of_rating]);
-
-                $seller_rating = ComboProduct::selectRaw('count(rating) as no_of_ratings, sum(rating) as sum_of_rating')
-                    ->where('seller_id', $product->seller_id)
-                    ->where('rating', '>', 0)
-                    ->first();
-
-                $no_of_ratings_seller = $seller_rating->no_of_ratings;
-                $total_rating_seller = $seller_rating->sum_of_rating;
-
-                $new_rating_seller = ($no_of_ratings_seller > 0) ? round($total_rating_seller / $no_of_ratings_seller, 1, PHP_ROUND_HALF_UP) : 0;
-
-                Seller::where('user_id', $product->seller_id)
-                    ->update(['rating' => $new_rating_seller, 'no_of_ratings' => $no_of_ratings_seller]);
-            }
             return true;
         } else {
             return false;

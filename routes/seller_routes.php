@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Redirect;
 use App\Http\Controllers\Seller\HomeController;
 use App\Http\Controllers\Seller\BrandController;
+use App\Http\Controllers\Seller\StickerController as SellerStickerController;
 use App\Http\Controllers\Seller\CategoryController;
 use App\Http\Controllers\Seller\PickupLocationController;
 use App\Http\Controllers\Seller\MediaController;
@@ -182,6 +183,10 @@ Route::group(
         Route::post("seller/product/bulk_upload", [ProductController::class, 'process_bulk_upload'])->name('seller.product.bulk_upload')->middleware(['demo_restriction']);
 
         Route::get('seller/product/view_product/{id}', [ProductController::class, 'show'])->name('seller.product.show');
+
+        Route::get("seller/product/change_variant_status", [ProductController::class, 'change_variant_status'])->name('seller.product.change_variant_status')->middleware(['demo_restriction']);
+
+        Route::get("seller/product/delete_variant", [ProductController::class, 'delete_variant'])->name('seller.product.delete_variant')->middleware(['demo_restriction']);
 
 
         //product faqs
@@ -429,6 +434,16 @@ Route::group(
         Route::get('seller/brands', [BrandController::class, 'index'])->name('seller_brands.index');
         Route::post('brands', [BrandController::class, 'store'])->middleware(['demo_restriction'])->name('seller.brands.store');
         Route::get('/brands/list', [BrandController::class, 'list'])->name('seller.brands.list');
+
+        // stickers
+        Route::get('seller/stickers', [SellerStickerController::class, 'index'])->name('seller.stickers.index');
+        Route::post('seller/stickers', [SellerStickerController::class, 'store'])->middleware(['demo_restriction'])->name('seller.stickers.store');
+        Route::get('seller/stickers/list', [SellerStickerController::class, 'list'])->name('seller.stickers.list');
+        Route::get('seller/sticker/update_status/{id}', [SellerStickerController::class, 'update_status'])->middleware(['demo_restriction']);
+        Route::get('seller/stickers/edit/{id}', [SellerStickerController::class, 'edit'])->name('seller.stickers.edit');
+        Route::put('seller/stickers/update/{id}', [SellerStickerController::class, 'update'])->middleware(['demo_restriction'])->name('seller.stickers.update');
+        Route::get('seller/stickers/destroy/{id}', [SellerStickerController::class, 'destroy'])->name('seller.stickers.destroy')->middleware(['demo_restriction']);
+        Route::delete('seller/stickers/delete', [SellerStickerController::class, 'delete_selected_data'])->name('seller.stickers.delete')->middleware(['demo_restriction']);
     }
 
 

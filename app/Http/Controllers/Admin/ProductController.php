@@ -468,6 +468,11 @@ class ProductController extends Controller
             $data['other_images'] = json_encode($request->other_images, 1);
             $product = Product::create($data);
 
+            // Store Key Features rows
+            saveKeyFeatures(\App\Models\ProductKeyFeature::class, $product->id, $request->input('key_features', []));
+            syncStickers('product_sticker', 'product_id', $product->id, $request->input('stickers', []));
+            saveProductSections(\App\Models\ProductSection::class, $product->id, $request->input('sections', []));
+
             // Store custom fields values
             // if (isset($request->custom_fields) && !empty($request->custom_fields)) {
             //     foreach ($request->input('custom_fields', []) as $fieldId => $fieldArray) {
@@ -1472,6 +1477,11 @@ if ($request->product_type == 'simple_product') {
 
             $product = Product::where('id', $data)->update($product_data);
 
+            // Store Key Features rows
+            saveKeyFeatures(\App\Models\ProductKeyFeature::class, $data, $request->input('key_features', []));
+            syncStickers('product_sticker', 'product_id', $data, $request->input('stickers', []));
+            saveProductSections(\App\Models\ProductSection::class, $data, $request->input('sections', []));
+
 
             // Store custom fields values
             // if ($request->has('custom_fields')) {
@@ -1605,7 +1615,7 @@ Product_variants::where('product_id', $data)->update([
 
 if ($request->product_type == 'simple_product') {
 
-    Product_variants::create([
+    $simple_variant_data = [
         'product_id' => $data,
         'price' => $request->simple_price ?? 0,
         'special_price' => $request->simple_special_price ?? 0,
@@ -1615,23 +1625,40 @@ if ($request->product_type == 'simple_product') {
         'length' => $request->length ?? 0,
         'status' => 1,
         'availability' => 1,
-    ]);
+    ];
+
+    // Reuse the existing variant instead of creating a duplicate on every save
+    $existing_variant = Product_variants::where('product_id', $data)->orderBy('id')->first();
+    if ($existing_variant) {
+        $existing_variant->update($simple_variant_data);
+    } else {
+        Product_variants::create($simple_variant_data);
+    }
 
 } elseif ($request->product_type == 'digital_product') {
 
-    Product_variants::create([
+    $digital_variant_data = [
         'product_id' => $data,
         'price' => $request->simple_price ?? 0,
         'special_price' => $request->simple_special_price ?? 0,
         'status' => 1,
         'availability' => 1,
-    ]);
+    ];
+
+    // Reuse the existing variant instead of creating a duplicate on every save
+    $existing_variant = Product_variants::where('product_id', $data)->orderBy('id')->first();
+    if ($existing_variant) {
+        $existing_variant->update($digital_variant_data);
+    } else {
+        Product_variants::create($digital_variant_data);
+    }
 
 } elseif ($request->product_type == 'variable_product') {
 
     if (!empty($request->variants_ids) && is_array($request->variants_ids)) {
 
         $variant_images = $request->variant_images ?? [];
+        $edit_variant_ids = $request->edit_variant_id ?? [];
 
         $count = count($request->variants_ids);
 
@@ -1648,7 +1675,7 @@ if ($request->product_type == 'simple_product') {
 
     $attributeValueIds = str_replace(' ', ',', trim($request->variants_ids[$i]));
 
-    Product_variants::create([
+    $variant_payload = [
         'product_id' => $data,
         'attribute_value_ids' => $attributeValueIds,
         'price' => $request->variant_price[$i] ?? 0,
@@ -1662,7 +1689,18 @@ if ($request->product_type == 'simple_product') {
         'availability' => $request->variant_level_stock_status[$i] ?? 1,
         'status' => 1,
         'images' => !empty($variant_images[$i]) ? json_encode($variant_images[$i]) : null,
-    ]);
+    ];
+
+    $existing_variant_id = $edit_variant_ids[$i] ?? null;
+
+    if (!empty($existing_variant_id)) {
+        // Update the existing variant in place instead of creating a duplicate
+        Product_variants::where('id', $existing_variant_id)
+            ->where('product_id', $data)
+            ->update($variant_payload);
+    } else {
+        Product_variants::create($variant_payload);
+    }
 }
     }
 }

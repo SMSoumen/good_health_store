@@ -409,6 +409,29 @@ class ProductService
                     $product['product_rating_data'] = $rating ?? [];
 
                     $product['price_range'] = $this->getPriceRangeOfProduct($productId);
+
+                    $product['key_features'] = \App\Models\ProductKeyFeature::where('product_id', $product['id'])
+                        ->orderBy('row_order')
+                        ->orderBy('id')
+                        ->get(['feature', 'details'])
+                        ->toArray();
+
+                    $product['stickers'] = \App\Models\Sticker::where('status', 1)
+                        ->whereIn('id', function ($q) use ($product) {
+                            $q->select('sticker_id')
+                                ->from('product_sticker')
+                                ->where('product_id', $product['id']);
+                        })
+                        ->orderBy('text')
+                        ->get(['id', 'text', 'image'])
+                        ->toArray();
+
+                    $product['sections'] = \App\Models\ProductSection::where('product_id', $product['id'])
+                        ->where('is_active', 1)
+                        ->orderBy('row_order')
+                        ->orderBy('id')
+                        ->get(['title', 'content'])
+                        ->toArray();
                 }
 
                 $product['attributes'] = $this->getAttributeValuesByPid($productId);
@@ -1328,9 +1351,15 @@ class ProductService
             'max_price' => round($maxPrice, 2)
         ];
     }
-    public function fetchRating($productId = null, $userId = null, $limit = null, $offset = null, $sort = null, $order = null, $ratingId = null, $hasImages = null, $count_empty_comments = false, $rating = '')
+    public function fetchRating($productId = null, $userId = null, $limit = null, $offset = null, $sort = null, $order = null, $ratingId = null, $hasImages = null, $count_empty_comments = false, $rating = '', $onlyApproved = true)
     {
         $query = ProductRating::with('user');
+
+        // Customer-facing callers only ever see admin-approved reviews (status = 1).
+        // Seller/admin callers pass $onlyApproved = false to see everything.
+        if ($onlyApproved) {
+            $query->where('status', 1);
+        }
 
         if (!empty($productId)) {
             $query->where('product_id', $productId);
@@ -1400,9 +1429,11 @@ class ProductService
             ];
         });
 
-        // Stats
-        $totalRating = ProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->count();
-        $totalImages = ProductRating::when($productId, fn($q) => $q->where('product_id', $productId))
+        // Stats (counted over the same approved/unapproved scope as the list above)
+        $approvedScope = fn($q) => $onlyApproved ? $q->where('status', 1) : $q;
+
+        $totalRating = ProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->where($approvedScope)->count();
+        $totalImages = ProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->where($approvedScope)
             ->whereNotNull('images')
             ->get()
             ->reduce(function ($carry, $item) {
@@ -1411,11 +1442,11 @@ class ProductService
                 return $carry + $count;
             }, 0);
 
-        $totalReviewsWithImages = ProductRating::when($productId, fn($q) => $q->where('product_id', $productId))
+        $totalReviewsWithImages = ProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->where($approvedScope)
             ->whereNotNull('images')
             ->count();
 
-        $totalReviewsData = ProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->get();
+        $totalReviewsData = ProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->where($approvedScope)->get();
 
         $ratings = ['1' => 0, '2' => 0, '3' => 0, '4' => 0, '5' => 0];
         $sum = 0;
@@ -1441,6 +1472,7 @@ class ProductService
         $no_of_reviews = 0;
         if ($count_empty_comments) {
             $no_of_reviews = ProductRating::where('product_id', $productId)
+                ->where($approvedScope)
                 ->whereNotNull('comment')
                 ->where('comment', '!=', '')
                 ->count();

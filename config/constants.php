@@ -24,7 +24,7 @@ return [
     'RESOLVED' => '3',
     'CLOSED' => '4',
     'REOPEN' => '5',
-    'theme' => 'elegant',
+    'theme' => 'ghs',
     'APP_CODE' => '56320259',
     'WEB_CODE' => '56605998',
     // demo mode

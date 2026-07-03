@@ -94,11 +94,17 @@ class CustomerRatings extends Component
 
     public function getProductRating($product_id, $type)
     {
-        if ($type == 'combo-product') {
-            $product_ratings = fetchDetails(ComboProductRating::class, ['product_id' => $product_id]);
-        } else {
-            $product_ratings = fetchDetails(ProductRating::class, ['product_id' => $product_id]);
-        }
+        // Show admin-approved reviews to everyone, plus the current user's own
+        // review (even while pending) so they can see its moderation state.
+        $ratingModel = $type == 'combo-product' ? ComboProductRating::class : ProductRating::class;
+        $product_ratings = $ratingModel::where('product_id', $product_id)
+            ->where(function ($q) {
+                $q->where('status', 1);
+                if (!empty($this->user_id)) {
+                    $q->orWhere('user_id', $this->user_id);
+                }
+            })
+            ->get();
         return $product_ratings;
     }
 
@@ -146,6 +152,10 @@ class CustomerRatings extends Component
             $validated['comment'] = $this->comment;
             $validated['user_id'] = Auth::user()->id;
 
+            // Both product and combo reviews require admin approval before being
+            // published. Submitting or editing (re)sets the review to pending (0).
+            $validated['status'] = 0;
+
             if ($this->review_id) {
                 if ($this->product_type == "combo-product") {
                     $existingReview = ComboProductRating::findOrFail($this->review_id);
@@ -164,7 +174,7 @@ class CustomerRatings extends Component
                     }
                 }
                 $existingReview->update($validated);
-                $this->dispatch('showSuccess', 'The review has been successfully updated.');
+                $this->dispatch('showSuccess', 'Your review has been submitted and is awaiting approval.');
             } else {
                 $validated['images'] = json_encode($images);
                 if ($this->product_type == "combo-product") {
@@ -172,25 +182,12 @@ class CustomerRatings extends Component
                 } else {
                     ProductRating::create($validated);
                 }
-                $this->dispatch('showSuccess', 'The review has been successfully added.');
+                $this->dispatch('showSuccess', 'Your review has been submitted and is awaiting approval.');
                 $this->is_disabled = true;
             }
-            if ($this->product_type == "combo-product") {
-                $averageRating = ComboProductRating::where(["product_id" => $this->product_id])->avg('rating');
-            } else {
-                $averageRating = ProductRating::where(["product_id" => $this->product_id])->avg('rating');
-            }
-            $ratingUpdate = [
-                'rating' => $averageRating
-            ];
-            if (!$this->review_id) {
-                $ratingUpdate['no_of_ratings'] = DB::raw('no_of_ratings + 1');
-            }
-            if ($this->product_type == "combo-product") {
-                updateDetails($ratingUpdate, ['id' => $validated['product_id']], ComboProduct::class);
-            } else {
-                updateDetails($ratingUpdate, ['id' => $validated['product_id']], Product::class);
-            }
+            // A pending review must not affect the published aggregate; recompute
+            // strictly from approved reviews.
+            $this->recalculateAggregate($validated['product_id'], $this->product_type);
             return;
         }
     }
@@ -207,20 +204,28 @@ class CustomerRatings extends Component
             $delete = $existingReview->delete();
             $this->dispatch('showSuccess', 'The review has been successfully removed.');
             $this->is_disabled = false;
-            if ($this->product_type == "combo-product") {
-                $averageRating = ComboProductRating::where(["product_id" => $this->product_id])->avg('rating');
-            } else {
-                $averageRating = ProductRating::where(["product_id" => $this->product_id])->avg('rating');
-            }
-            $ratingUpdate = [
-                'no_of_ratings' => DB::raw('no_of_ratings - 1'),
-                'rating' => $averageRating
-            ];
-            if ($this->product_type == "combo-product") {
-                $update = updateDetails($ratingUpdate, ['id' => $this->product_id], ComboProduct::class);
-            } else {
-                $update = updateDetails($ratingUpdate, ['id' => $this->product_id], Product::class);
-            }
+            $this->recalculateAggregate($this->product_id, $this->product_type);
         }
+    }
+
+    /**
+     * Recompute a product's (or combo product's) published average rating and
+     * review count from APPROVED reviews only (status = 1).
+     */
+    private function recalculateAggregate($product_id, $type)
+    {
+        $isCombo = $type == "combo-product";
+        $ratingModel = $isCombo ? ComboProductRating::class : ProductRating::class;
+        $productModel = $isCombo ? ComboProduct::class : Product::class;
+
+        $approvedCount = $ratingModel::where('product_id', $product_id)->where('status', 1)->count();
+        $averageRating = $approvedCount > 0
+            ? $ratingModel::where('product_id', $product_id)->where('status', 1)->avg('rating')
+            : 0;
+
+        updateDetails([
+            'rating' => $averageRating,
+            'no_of_ratings' => $approvedCount,
+        ], ['id' => $product_id], $productModel);
     }
 }

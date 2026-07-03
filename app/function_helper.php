@@ -1645,6 +1645,12 @@ if (!function_exists('getBrandDisplayComponent')) {
 if (!function_exists('getHomeTheme')) {
     function getHomeTheme($store_settings)
     {
+        // GHS is a dedicated brand theme: always use its home view regardless of the
+        // store's web_home_page_theme variant setting.
+        if (config('constants.theme') === 'ghs') {
+            return 'livewire.ghs.home.home';
+        }
+
         $home_theme = $store_settings['web_home_page_theme'] ?? 'web_home_page_theme_1';
 
         return match ($home_theme) {
@@ -1660,6 +1666,12 @@ if (!function_exists('getHomeTheme')) {
 if (!function_exists('getHeaderStyle')) {
     function getHeaderStyle($store_settings)
     {
+        // GHS is a dedicated brand theme: always use its header regardless of the
+        // store's web_home_page_theme variant setting.
+        if (config('constants.theme') === 'ghs') {
+            return 'components.header.ghs';
+        }
+
         $home_theme = $store_settings['web_home_page_theme'] ?? 'web_home_page_theme_1';
 
         return match ($home_theme) {
@@ -1848,4 +1860,159 @@ function getAffiliateCategoriesOptionHtml($categories, $selected_vals = [], $lev
     }
 
     return $html;
+}
+
+if (!function_exists('saveKeyFeatures')) {
+    /**
+     * Sync a product's repeatable "Key Features" rows.
+     *
+     * Works for both regular products (App\Models\ProductKeyFeature) and combo
+     * products (App\Models\ComboProductKeyFeature). Uses a delete-then-insert
+     * strategy so the same call handles create and update.
+     *
+     * @param string $modelClass  Fully qualified key-feature model class.
+     * @param int|string $productId  Owning product / combo product id.
+     * @param array|null $keyFeatures  Submitted rows: [['feature' => ..., 'details' => ...], ...]
+     */
+    function saveKeyFeatures($modelClass, $productId, $keyFeatures)
+    {
+        $modelClass::where('product_id', $productId)->delete();
+
+        if (empty($keyFeatures) || !is_array($keyFeatures)) {
+            return;
+        }
+
+        $order = 0;
+        foreach ($keyFeatures as $row) {
+            $feature = trim($row['feature'] ?? '');
+            if ($feature === '') {
+                continue;
+            }
+
+            $modelClass::create([
+                'product_id' => $productId,
+                'feature' => $feature,
+                'details' => $row['details'] ?? '',
+                'row_order' => $order++,
+            ]);
+        }
+    }
+}
+
+if (!function_exists('syncStickers')) {
+    /**
+     * Sync the stickers attached to a product / combo product.
+     *
+     * Stickers are a shared, store-wide master list, so the link is a simple
+     * many-to-many pivot. Uses a delete-then-insert strategy so the same call
+     * handles both create and update.
+     *
+     * @param string $pivotTable  Pivot table name (product_sticker / combo_product_sticker).
+     * @param string $foreignKey  Owner column on the pivot (product_id / combo_product_id).
+     * @param int|string $ownerId  Owning product / combo product id.
+     * @param array|null $stickerIds  Submitted sticker ids.
+     */
+    function syncStickers($pivotTable, $foreignKey, $ownerId, $stickerIds)
+    {
+        \Illuminate\Support\Facades\DB::table($pivotTable)->where($foreignKey, $ownerId)->delete();
+
+        if (empty($stickerIds) || !is_array($stickerIds)) {
+            return;
+        }
+
+        $rows = [];
+        foreach (array_unique($stickerIds) as $stickerId) {
+            if ($stickerId === '' || $stickerId === null) {
+                continue;
+            }
+            $rows[] = [
+                $foreignKey => $ownerId,
+                'sticker_id' => (int) $stickerId,
+            ];
+        }
+
+        if (!empty($rows)) {
+            \Illuminate\Support\Facades\DB::table($pivotTable)->insert($rows);
+        }
+    }
+}
+
+if (!function_exists('getStickersList')) {
+    /**
+     * Fetch the active stickers for the current store, used to render the
+     * "attach stickers" selector on product / combo product forms.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    function getStickersList()
+    {
+        $storeId = app(\App\Services\StoreService::class)->getStoreId();
+
+        return \App\Models\Sticker::where('status', 1)
+            ->when($storeId, fn($q) => $q->where('store_id', $storeId))
+            ->orderBy('text')
+            ->get(['id', 'text', 'image']);
+    }
+}
+
+if (!function_exists('getAttachedStickerIds')) {
+    /**
+     * Return the sticker ids currently attached to a product / combo product.
+     *
+     * @param string $pivotTable  Pivot table name.
+     * @param string $foreignKey  Owner column on the pivot.
+     * @param int|string $ownerId  Owning product / combo product id.
+     * @return array
+     */
+    function getAttachedStickerIds($pivotTable, $foreignKey, $ownerId)
+    {
+        return \Illuminate\Support\Facades\DB::table($pivotTable)
+            ->where($foreignKey, $ownerId)
+            ->pluck('sticker_id')
+            ->map(fn($id) => (int) $id)
+            ->toArray();
+    }
+}
+
+if (!function_exists('saveProductSections')) {
+    /**
+     * Sync a product's fixed "Detail Sections" (title + rich-text content + on/off).
+     *
+     * Works for both regular products (App\Models\ProductSection) and combo
+     * products (App\Models\ComboProductSection). Uses a delete-then-insert
+     * strategy so the same call handles create and update. A slot is skipped
+     * only when both its title and content are empty; row_order preserves the
+     * form slot order so tabs render in the same sequence on the frontend.
+     *
+     * @param string $modelClass  Fully qualified section model class.
+     * @param int|string $productId  Owning product / combo product id.
+     * @param array|null $sections  Submitted rows: [['title' => ..., 'content' => ..., 'is_active' => 0|1], ...]
+     */
+    function saveProductSections($modelClass, $productId, $sections)
+    {
+        $modelClass::where('product_id', $productId)->delete();
+
+        if (empty($sections) || !is_array($sections)) {
+            return;
+        }
+
+        $order = 0;
+        foreach ($sections as $row) {
+            $title = trim($row['title'] ?? '');
+            $content = $row['content'] ?? '';
+
+            // Skip fully empty slots so they don't create noise / empty tabs.
+            if ($title === '' && trim(strip_tags((string) $content)) === '') {
+                continue;
+            }
+
+            $modelClass::create([
+                'product_id' => $productId,
+                'title' => $title,
+                'content' => $content,
+                'is_active' => !empty($row['is_active']) ? 1 : 0,
+                'row_order' => $order++,
+            ]);
+        }
+    }
 }

@@ -391,6 +391,29 @@ class ComboProductService
 
                 $product[$i]->product_rating_data = isset($rating) ? $rating : [];
 
+                $product[$i]->key_features = \App\Models\ComboProductKeyFeature::where('product_id', $product[$i]->id)
+                    ->orderBy('row_order')
+                    ->orderBy('id')
+                    ->get(['feature', 'details'])
+                    ->toArray();
+
+                $product[$i]->stickers = \App\Models\Sticker::where('status', 1)
+                    ->whereIn('id', function ($q) use ($product, $i) {
+                        $q->select('sticker_id')
+                            ->from('combo_product_sticker')
+                            ->where('combo_product_id', $product[$i]->id);
+                    })
+                    ->orderBy('text')
+                    ->get(['id', 'text', 'image'])
+                    ->toArray();
+
+                $product[$i]->sections = \App\Models\ComboProductSection::where('product_id', $product[$i]->id)
+                    ->where('is_active', 1)
+                    ->orderBy('row_order')
+                    ->orderBy('id')
+                    ->get(['title', 'content'])
+                    ->toArray();
+
                 $product[$i]->tax_id = ((isset($product[$i]->tax_id) && intval($product[$i]->tax_id) > 0) && $product[$i]->tax_id != "") ? $product[$i]->tax_id : '0';
                 $taxes = [];
                 $tax_ids = explode(",", $product[$i]->tax_id);
@@ -1030,10 +1053,16 @@ class ComboProductService
             ->toArray();
     }
 
-    public function fetchComboRating($productId = null, $userId = null, $limit = null, $offset = null, $sort = null, $order = null, $ratingId = null, $hasImages = null)
+    public function fetchComboRating($productId = null, $userId = null, $limit = null, $offset = null, $sort = null, $order = null, $ratingId = null, $hasImages = null, $onlyApproved = true)
     {
 
         $query = ComboProductRating::with('user');
+
+        // Customer-facing callers only ever see admin-approved reviews (status = 1).
+        // Seller callers pass $onlyApproved = false to see everything.
+        if ($onlyApproved) {
+            $query->where('status', 1);
+        }
 
         if (!empty($productId)) {
             $query->where('product_id', $productId);
@@ -1085,10 +1114,12 @@ class ComboProductService
             ];
         });
 
-        // Stats
-        $totalRating = ComboProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->count();
+        // Stats (counted over the same approved/unapproved scope as the list above)
+        $approvedScope = fn($q) => $onlyApproved ? $q->where('status', 1) : $q;
 
-        $totalImages = ComboProductRating::when($productId, fn($q) => $q->where('product_id', $productId))
+        $totalRating = ComboProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->where($approvedScope)->count();
+
+        $totalImages = ComboProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->where($approvedScope)
             ->whereNotNull('images')
             ->get()
             ->reduce(function ($carry, $item) {
@@ -1097,11 +1128,11 @@ class ComboProductService
                 return $carry + $count;
             }, 0);
 
-        $totalReviewsWithImages = ComboProductRating::when($productId, fn($q) => $q->where('product_id', $productId))
+        $totalReviewsWithImages = ComboProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->where($approvedScope)
             ->whereNotNull('images')
             ->count();
 
-        $totalReviewsData = ComboProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->get();
+        $totalReviewsData = ComboProductRating::when($productId, fn($q) => $q->where('product_id', $productId))->where($approvedScope)->get();
 
         $ratings = [
             '1' => 0,
@@ -1126,7 +1157,7 @@ class ComboProductService
         }
 
         $no_of_reviews = 0;
-        $no_of_reviews = ComboProductRating::where('product_id', $productId)
+        $no_of_reviews = ComboProductRating::where('product_id', $productId)->where($approvedScope)
             ->whereNotNull('comment')
             ->where('comment', '!=', '')
             ->count();

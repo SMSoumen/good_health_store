@@ -573,11 +573,13 @@
                             class="tablink"rel="description">{{ labels('front_messages.description', 'Description') }}</a>
                     </li>
                 @endif
+                <x-product-section-tab-links :sections="$product_details->sections ?? []" />
                 @if ($product_details->attributes != [])
                     <li rel="additionalInformation"><a class="tablink"
                             rel="additionalInformation">{{ labels('front_messages.additional_information', 'Additional Information') }}</a>
                     </li>
                 @endif
+                <x-product-faq-tab-link :faqs="$product_details->product_faq['data'] ?? []" />
                 <li rel="reviews"><a class="tablink"
                         rel="reviews">{{ labels('front_messages.reviews', 'Reviews') }}</a></li>
             </ul>
@@ -601,6 +603,7 @@
                     </div>
                     <!--End Description-->
                 @endif
+                <x-product-section-tab-content :sections="$product_details->sections ?? []" />
                 @if ($product_details->attributes != [])
                     <!--Additional Information-->
                     <h3 class="tabs-ac-style d-md-none" rel="additionalInformation">
@@ -627,6 +630,7 @@
                     </div>
                     <!--End Additional Information-->
                 @endif
+                <x-product-faq-tab-content :faqs="$product_details->product_faq['data'] ?? []" />
                 <!--Review-->
                 <h3 class="tabs-ac-style d-md-none" rel="reviews">{{ labels('front_messages.reviews', 'Reviews') }}
                 </h3>

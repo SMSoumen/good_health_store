@@ -263,6 +263,11 @@ class ComboProductController extends Controller
         // --- Create Product ---
         $product = ComboProduct::create($product_data);
 
+        // Store Key Features rows
+        saveKeyFeatures(\App\Models\ComboProductKeyFeature::class, $product->id, $request->input('key_features', []));
+        syncStickers('combo_product_sticker', 'combo_product_id', $product->id, $request->input('stickers', []));
+        saveProductSections(\App\Models\ComboProductSection::class, $product->id, $request->input('sections', []));
+
         // --- Custom Fields Save Logic ---
         if ($product && $request->has('custom_fields')) {
             foreach ($request->custom_fields as $fieldId => $fieldArray) {
@@ -560,6 +565,11 @@ class ComboProductController extends Controller
 
         // --- Product Update ---
         $product = ComboProduct::where('id', $data)->update($update_data);
+
+        // Store Key Features rows
+        saveKeyFeatures(\App\Models\ComboProductKeyFeature::class, $data, $request->input('key_features', []));
+        syncStickers('combo_product_sticker', 'combo_product_id', $data, $request->input('stickers', []));
+        saveProductSections(\App\Models\ComboProductSection::class, $data, $request->input('sections', []));
 
         // --- Custom Fields Update Logic ---
         if ($request->has('custom_fields')) {

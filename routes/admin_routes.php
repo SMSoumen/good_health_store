@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\AreaController;
 use App\Http\Controllers\Admin\HomeController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\BrandController;
+use App\Http\Controllers\Admin\StickerController;
 use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\OfferController;
 use App\Http\Controllers\Admin\SellerController;
@@ -50,6 +51,9 @@ use App\Http\Controllers\Admin\CustomFieldController;
 use App\Http\Controllers\Admin\AffiliateSettingController;
 use App\Http\Controllers\Admin\AffiliateController;
 use App\Http\Controllers\Admin\SeoController;
+use App\Http\Controllers\Admin\NewsletterController;
+use App\Http\Controllers\Admin\BulkGiftingInquiryController;
+use App\Http\Controllers\Admin\ReviewController;
 
 Route::get('admin/cronjob/settleSellerCommission', [CronJobController::class, 'settleSellerCommission'])->middleware(['demo_restriction'])->middleware('permissions:edit seller');
 Route::get('admin/cronjob/settleCashbackDiscount', [CronJobController::class, 'settleCashbackDiscount'])->middleware(['demo_restriction']);
@@ -336,6 +340,16 @@ Route::group(
             Route::get('brands/edit/{id}', [BrandController::class, 'edit'])->name('brands.edit');
 
             Route::put('brands/update/{id}', [BrandController::class, 'update'])->middleware(['demo_restriction'])->middleware('permissions:edit brands');
+
+            // stickers
+            Route::get('stickers', [StickerController::class, 'index'])->name('stickers.index')->middleware('CheckDefaultStore');
+            Route::post('stickers', [StickerController::class, 'store'])->middleware(['demo_restriction'])->name('stickers.store');
+            Route::get('stickers/list', [StickerController::class, 'list'])->name('stickers.list');
+            Route::get('sticker/update_status/{id}', [StickerController::class, 'update_status'])->middleware(['demo_restriction']);
+            Route::get('stickers/edit/{id}', [StickerController::class, 'edit'])->name('stickers.edit');
+            Route::put('stickers/update/{id}', [StickerController::class, 'update'])->middleware(['demo_restriction'])->name('stickers.update');
+            Route::get('stickers/destroy/{id}', [StickerController::class, 'destroy'])->name('stickers.destroy')->middleware(['demo_restriction']);
+            Route::delete('stickers/delete', [StickerController::class, 'delete_selected_data'])->name('stickers.delete')->middleware(['demo_restriction']);
 
             //taxes
 
@@ -811,6 +825,30 @@ Route::group(
         Route::put('admin/faq/update/{id}', [FaqController::class, 'update'])->name('faqs.update')->middleware(['demo_restriction'])->middleware('permissions:edit faq');
 
         Route::get('faqs/destroy/{id}', [FaqController::class, 'destroy'])->name('faqs.destroy')->middleware(['demo_restriction'])->middleware('permissions:delete faq');
+
+        // newsletter subscribers
+        Route::get('admin/newsletter', [NewsletterController::class, 'index'])->name('admin.newsletter.index');
+        Route::get('admin/newsletter/list', [NewsletterController::class, 'list'])->name('admin.newsletter.list');
+        Route::post('admin/newsletter', [NewsletterController::class, 'store'])->name('admin.newsletter.store')->middleware(['demo_restriction'])->middleware('permissions:create newsletter');
+        Route::get('admin/newsletter/update_status/{id}', [NewsletterController::class, 'update_status'])->name('admin.newsletter.update_status')->middleware(['demo_restriction'])->middleware('permissions:edit newsletter');
+        Route::get('admin/newsletter/destroy/{id}', [NewsletterController::class, 'destroy'])->name('admin.newsletter.destroy')->middleware(['demo_restriction'])->middleware('permissions:delete newsletter');
+        Route::delete('admin/newsletter/delete', [NewsletterController::class, 'delete_selected_data'])->name('admin.newsletter.delete')->middleware(['demo_restriction'])->middleware('permissions:delete newsletter');
+
+        // bulk gifting inquiries
+        Route::get('admin/bulk-gifting-inquiries', [BulkGiftingInquiryController::class, 'index'])->name('admin.bulk_gifting_inquiries.index');
+        Route::get('admin/bulk-gifting-inquiries/list', [BulkGiftingInquiryController::class, 'list'])->name('admin.bulk_gifting_inquiries.list');
+        Route::get('admin/bulk-gifting-inquiries/export', [BulkGiftingInquiryController::class, 'export'])->name('admin.bulk_gifting_inquiries.export')->middleware('permissions:view bulk_gifting_inquiries');
+        Route::get('admin/bulk-gifting-inquiries/update_status/{id}', [BulkGiftingInquiryController::class, 'update_status'])->name('admin.bulk_gifting_inquiries.update_status')->middleware(['demo_restriction'])->middleware('permissions:edit bulk_gifting_inquiries');
+        Route::get('admin/bulk-gifting-inquiries/destroy/{id}', [BulkGiftingInquiryController::class, 'destroy'])->name('admin.bulk_gifting_inquiries.destroy')->middleware(['demo_restriction'])->middleware('permissions:delete bulk_gifting_inquiries');
+        Route::delete('admin/bulk-gifting-inquiries/delete', [BulkGiftingInquiryController::class, 'delete_selected_data'])->name('admin.bulk_gifting_inquiries.delete')->middleware(['demo_restriction'])->middleware('permissions:delete bulk_gifting_inquiries');
+
+        // product & combo review moderation (one screen, type-aware)
+        Route::get('admin/reviews', [ReviewController::class, 'index'])->defaults('type', 'product')->name('admin.reviews.index')->middleware('permissions:view reviews');
+        Route::get('admin/combo_reviews', [ReviewController::class, 'index'])->defaults('type', 'combo')->name('admin.combo_reviews.index')->middleware('permissions:view reviews');
+        Route::get('admin/reviews/list', [ReviewController::class, 'list'])->name('admin.reviews.list');
+        Route::get('admin/reviews/update_status/{id}', [ReviewController::class, 'update_status'])->name('admin.reviews.update_status')->middleware(['demo_restriction'])->middleware('permissions:edit reviews');
+        Route::get('admin/reviews/destroy/{id}', [ReviewController::class, 'destroy'])->name('admin.reviews.destroy')->middleware(['demo_restriction'])->middleware('permissions:delete reviews');
+        Route::delete('admin/reviews/delete', [ReviewController::class, 'delete_selected_data'])->name('admin.reviews.delete')->middleware(['demo_restriction'])->middleware('permissions:delete reviews');
 
         // ticket system
 

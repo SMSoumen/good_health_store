@@ -31,7 +31,8 @@ yarn-error.log
 /storage/dotenv-editor/backups/*.json
 
 
-DEVELOPMENT_MANUAL.md
+# DEVELOPMENT_MANUAL.md
+# GHS_STOREFRONT.md
 
 # OS files
 .DS_Store

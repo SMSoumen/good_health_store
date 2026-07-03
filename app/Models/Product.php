@@ -192,6 +192,18 @@ class Product extends Model
     {
         return $this->hasMany(ProductCustomFieldValue::class);
     }
+    public function keyFeatures()
+    {
+        return $this->hasMany(ProductKeyFeature::class, 'product_id')->orderBy('row_order')->orderBy('id');
+    }
+    public function stickers()
+    {
+        return $this->belongsToMany(Sticker::class, 'product_sticker', 'product_id', 'sticker_id');
+    }
+    public function sections()
+    {
+        return $this->hasMany(ProductSection::class, 'product_id')->orderBy('row_order')->orderBy('id');
+    }
     public function firstVariant()
     {
         return $this->hasOne(Product_variants::class)->orderBy('id');

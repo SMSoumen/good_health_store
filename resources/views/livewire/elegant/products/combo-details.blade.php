@@ -434,6 +434,7 @@
                             class="tablink"rel="description">{{ labels('front_messages.description', 'Description') }}</a>
                     </li>
                 @endif
+                <x-product-section-tab-links :sections="$product_details->sections ?? []" />
                 @if ($product_details->attributes != [])
                     <li rel="additionalInformation"><a class="tablink"
                             rel="additionalInformation">{{ labels('front_messages.additional_information', 'Additional Information') }}</a>
@@ -461,6 +462,7 @@
                     </div>
                     <!--End Description-->
                 @endif
+                <x-product-section-tab-content :sections="$product_details->sections ?? []" />
                 @if ($product_details->attributes != [])
                     <!--Additional Information-->
                     <h3 class="tabs-ac-style d-md-none" rel="additionalInformation">

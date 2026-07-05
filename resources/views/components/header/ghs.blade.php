@@ -331,7 +331,11 @@
         </div>
     @endif
 
-    <livewire:pages.model-cart />
+    {{-- Static offcanvas shell lives outside Livewire so cart re-renders never
+         interrupt Bootstrap's drawer show/hide lifecycle. --}}
+    <div wire:ignore class="offcanvas offcanvas-end" tabindex="-1" id="minicart-drawer">
+        <livewire:pages.model-cart :shell="false" />
+    </div>
     @if (isset($stores) &&
             count($stores) >= 1 &&
             url()->full() == customUrl(url()->full()) &&

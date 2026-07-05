@@ -11,9 +11,20 @@ class ModelCart extends Component
     protected $listeners = ['refreshComponent'];
 
     public $user_id;
+
+    // When false, the component renders only the cart contents and the
+    // offcanvas shell is provided by the parent (static, outside Livewire)
+    // so re-renders never interrupt Bootstrap's drawer show/hide lifecycle.
+    public $shell = true;
+
     public function __construct()
     {
         $this->user_id = Auth::user() != '' ? Auth::user()->id : NUll;
+    }
+
+    public function mount($shell = true)
+    {
+        $this->shell = $shell;
     }
     public $variant_id = "";
     public $qty = "";

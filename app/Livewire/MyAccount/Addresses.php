@@ -132,7 +132,7 @@ class Addresses extends Component
             'alternate_mobile',
             'address',
             'landmark',
-            'city_name',
+            'city',
             'city_id',
             'pincode',
             'country',
@@ -178,6 +178,9 @@ class Addresses extends Component
                 'message' => 'Address updated successfully!'
             ];
         } else {
+            // Make the user's first address the default automatically.
+            $address_data['is_default'] = Address::where('user_id', $user_id)->count() === 0 ? 1 : 0;
+
             // Insert new address if no address_id is provided
             $address_id = Address::insertGetId($address_data);
             if (!$address_id) {

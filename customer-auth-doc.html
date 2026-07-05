@@ -1,0 +1,418 @@
+<title>Customer Auth — Architecture & Review</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg:        #f4f5f9;
+    --surface:   #ffffff;
+    --surface-2: #eef0f6;
+    --ink:       #1a1d27;
+    --ink-soft:  #565b6e;
+    --ink-faint: #8b90a3;
+    --line:      #e0e2ec;
+    --line-soft: #ebedf3;
+    --accent:    #4f46e5;
+    --accent-ink:#4338ca;
+    --accent-wash:#edecfd;
+    --crit:      #c0344a;
+    --crit-wash: #fbe9ec;
+    --warn:      #a45a12;
+    --warn-wash: #fbefdd;
+    --ok:        #1f7a52;
+    --ok-wash:   #e2f3ea;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:        #0e1016;
+      --surface:   #161923;
+      --surface-2: #1d212d;
+      --ink:       #e7e9f0;
+      --ink-soft:  #a3a8ba;
+      --ink-faint: #6f7488;
+      --line:      #272b38;
+      --line-soft: #20232f;
+      --accent:    #8b85f5;
+      --accent-ink:#a5a0f8;
+      --accent-wash:#1e1d3a;
+      --crit:      #f0708a;
+      --crit-wash: #2c161c;
+      --warn:      #e0a55b;
+      --warn-wash: #2c2113;
+      --ok:        #55c391;
+      --ok-wash:   #12271d;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#f4f5f9; --surface:#ffffff; --surface-2:#eef0f6; --ink:#1a1d27; --ink-soft:#565b6e;
+    --ink-faint:#8b90a3; --line:#e0e2ec; --line-soft:#ebedf3; --accent:#4f46e5; --accent-ink:#4338ca;
+    --accent-wash:#edecfd; --crit:#c0344a; --crit-wash:#fbe9ec; --warn:#a45a12; --warn-wash:#fbefdd;
+    --ok:#1f7a52; --ok-wash:#e2f3ea;
+  }
+  :root[data-theme="dark"] {
+    --bg:#0e1016; --surface:#161923; --surface-2:#1d212d; --ink:#e7e9f0; --ink-soft:#a3a8ba;
+    --ink-faint:#6f7488; --line:#272b38; --line-soft:#20232f; --accent:#8b85f5; --accent-ink:#a5a0f8;
+    --accent-wash:#1e1d3a; --crit:#f0708a; --crit-wash:#2c161c; --warn:#e0a55b; --warn-wash:#2c2113;
+    --ok:#55c391; --ok-wash:#12271d;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .doc {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    padding: clamp(1.25rem, 4vw, 4rem) 1.25rem 5rem;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+
+  /* ---- header ---- */
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: .72rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+    display: flex; align-items: center; gap: .6rem;
+  }
+  .eyebrow::before {
+    content: ""; width: 26px; height: 1px; background: var(--accent); display: inline-block;
+  }
+  h1 {
+    font-size: clamp(1.9rem, 5.5vw, 2.9rem);
+    line-height: 1.08;
+    letter-spacing: -.02em;
+    text-wrap: balance;
+    margin: .9rem 0 .5rem;
+    font-weight: 720;
+  }
+  .lede {
+    font-size: 1.08rem;
+    color: var(--ink-soft);
+    max-width: 60ch;
+    margin: 0 0 1.6rem;
+  }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: .5rem;
+    font-family: var(--mono); font-size: .74rem;
+  }
+  .meta span {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 999px; padding: .28rem .7rem; color: var(--ink-soft);
+  }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  /* ---- stat row ---- */
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem;
+    margin: 2rem 0 2.4rem;
+  }
+  @media (max-width: 560px){ .stats { grid-template-columns: repeat(2,1fr);} }
+  .stat {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: .85rem .9rem;
+  }
+  .stat .k { font-family: var(--mono); font-size: .66rem; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint); }
+  .stat .v { font-size: 1.15rem; font-weight: 680; margin-top: .28rem; letter-spacing: -.01em; }
+  .stat .v small { font-size: .8rem; color: var(--ink-soft); font-weight: 500; }
+
+  /* ---- sections ---- */
+  section { margin-top: 2.8rem; }
+  .sec-head { display: flex; align-items: baseline; gap: .8rem; margin-bottom: 1.1rem; }
+  .sec-num { font-family: var(--mono); font-size: .8rem; color: var(--accent-ink); font-weight: 600; }
+  h2 { font-size: 1.35rem; letter-spacing: -.01em; margin: 0; font-weight: 680; }
+  h2 + .sub { color: var(--ink-soft); margin: -.4rem 0 0; }
+  p { margin: 0 0 1rem; }
+  a { color: var(--accent-ink); }
+
+  code, .path {
+    font-family: var(--mono); font-size: .84em;
+    background: var(--surface-2); border: 1px solid var(--line-soft);
+    padding: .08em .38em; border-radius: 5px; color: var(--ink);
+    white-space: nowrap;
+  }
+
+  /* ---- flow cards ---- */
+  .flow {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 1.1rem 1.2rem; margin-bottom: .8rem;
+    display: grid; grid-template-columns: auto 1fr; gap: 0 1rem;
+  }
+  .flow .tag {
+    grid-row: 1 / span 2;
+    font-family: var(--mono); font-size: .7rem; font-weight: 600;
+    writing-mode: horizontal-tb;
+    background: var(--accent-wash); color: var(--accent-ink);
+    border-radius: 8px; padding: .3rem .55rem; height: max-content;
+    letter-spacing: .04em;
+  }
+  .flow h3 { margin: 0 0 .15rem; font-size: 1.02rem; font-weight: 660; }
+  .flow .file { font-family: var(--mono); font-size: .74rem; color: var(--ink-faint); margin-bottom: .55rem; }
+  .flow ul { margin: 0; padding-left: 1.05rem; color: var(--ink-soft); }
+  .flow li { margin: .2rem 0; }
+  .flow li b { color: var(--ink); font-weight: 600; }
+
+  /* ---- route table ---- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: .86rem; min-width: 520px; }
+  th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--line-soft); }
+  thead th { font-family: var(--mono); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--ink-faint); background: var(--surface-2); border-bottom: 1px solid var(--line); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.route { font-family: var(--mono); font-size: .8rem; color: var(--ink); white-space: nowrap; }
+  .gd { display:inline-block; font-family: var(--mono); font-size: .68rem; font-weight:600;
+    padding: .12rem .5rem; border-radius: 999px; }
+  .gd.guest { background: var(--accent-wash); color: var(--accent-ink); }
+  .gd.auth  { background: var(--ok-wash); color: var(--ok); }
+  .gd.open  { background: var(--surface-2); color: var(--ink-soft); }
+
+  /* ---- findings ---- */
+  .finding {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 4px solid var(--sev); border-radius: 12px;
+    padding: 1rem 1.15rem; margin-bottom: .85rem;
+  }
+  .finding.crit { --sev: var(--crit); }
+  .finding.warn { --sev: var(--warn); }
+  .finding.info { --sev: var(--ink-faint); }
+  .finding .top { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .45rem; }
+  .sev {
+    font-family: var(--mono); font-size: .64rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; padding: .2rem .55rem; border-radius: 6px;
+  }
+  .finding.crit .sev { background: var(--crit-wash); color: var(--crit); }
+  .finding.warn .sev { background: var(--warn-wash); color: var(--warn); }
+  .finding.info .sev { background: var(--surface-2); color: var(--ink-soft); }
+  .finding h3 { margin: 0; font-size: 1.02rem; font-weight: 640; }
+  .finding p { margin: 0; color: var(--ink-soft); font-size: .94rem; }
+  .finding .fix {
+    margin-top: .6rem; font-size: .88rem; color: var(--ink);
+    background: var(--surface-2); border-radius: 8px; padding: .55rem .75rem;
+  }
+  .finding .fix b { font-family: var(--mono); font-size: .72rem; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--ink-faint); display:block; margin-bottom: .15rem; }
+
+  .callout {
+    background: var(--accent-wash); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 12px; padding: 1rem 1.15rem; color: var(--ink);
+    font-size: .94rem;
+  }
+  .callout b { color: var(--accent-ink); }
+
+  /* ---- method comparison ---- */
+  .methods { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-bottom: 1rem; }
+  @media (max-width: 620px){ .methods { grid-template-columns: 1fr; } }
+  .method {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 14px; padding: 1.1rem 1.2rem;
+    display: flex; flex-direction: column;
+  }
+  .method .badge {
+    align-self: flex-start;
+    font-family: var(--mono); font-size: .64rem; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; padding: .22rem .55rem; border-radius: 6px;
+    background: var(--accent-wash); color: var(--accent-ink); margin-bottom: .55rem;
+  }
+  .method.hosted .badge { background: var(--ok-wash); color: var(--ok); }
+  .method h3 { margin: 0 0 .2rem; font-size: 1.05rem; font-weight: 660; }
+  .method .who { font-family: var(--mono); font-size: .72rem; color: var(--ink-faint); margin-bottom: .7rem; }
+  .method ul { margin: 0 0 .2rem; padding-left: 1.05rem; color: var(--ink-soft); font-size: .92rem; }
+  .method li { margin: .28rem 0; }
+  .method li b { color: var(--ink); font-weight: 600; }
+  .method .foot {
+    margin-top: auto; padding-top: .7rem; font-size: .84rem; color: var(--ink-soft);
+    border-top: 1px solid var(--line-soft);
+  }
+  .method .foot b { color: var(--ink); }
+
+  footer {
+    margin-top: 3.5rem; padding-top: 1.3rem; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: .74rem; color: var(--ink-faint);
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: .5rem;
+  }
+</style>
+
+<div class="doc">
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">Architecture &amp; Security Review</div>
+    <h1>Customer Authentication System</h1>
+    <p class="lede">How shoppers register, sign in, verify, and recover access on the GHS storefront — a session-based auth stack built on Laravel&nbsp;10 and Livewire — plus the security gaps found while tracing it.</p>
+    <div class="meta">
+      <span>Stack&nbsp; <b>Laravel 10 · Livewire · Inertia/React</b></span>
+      <span>Theme&nbsp; <b>ghs</b></span>
+      <span>Reviewed&nbsp; <b>2026-07-03</b></span>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="k">Guard</div><div class="v">web <small>· session</small></div></div>
+    <div class="stat"><div class="k">Provider</div><div class="v">users <small>· eloquent</small></div></div>
+    <div class="stat"><div class="k">Customer role</div><div class="v">role_id&nbsp;=&nbsp;2</div></div>
+    <div class="stat"><div class="k">Findings</div><div class="v">4 <small>· 2 critical</small></div></div>
+  </div>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">01</span><h2>How it fits together</h2></div>
+    <p>Every account type — customer, seller, admin, delivery boy, affiliate — lives in a <b>single <code>users</code> table</b>, separated only by <code>role_id</code>. Customers are <code>role_id&nbsp;=&nbsp;2</code>. Authentication is <b>session-based</b> through the <code>web</code> guard; the storefront does not use API tokens for its own pages.</p>
+    <p>Auth is implemented mostly as <b>Livewire components</b> under <span class="path">app/Livewire/RegisterAndLogin/</span> rather than traditional controllers, with a thin <code>AuthController</code> handling SMS OTP and <code>UserController</code> handling logout. The model <span class="path">app/Models/User.php</span> pulls in Spatie roles/permissions and casts <code>password&nbsp;=&gt;&nbsp;hashed</code>.</p>
+    <div class="callout">Note: in <span class="path">config/auth.php</span> the <b>api</b> guard is also set to the <code>session</code> driver (Sanctum is commented out), so API-style calls still ride on the web session rather than bearer tokens.</div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">02</span><h2>The flows</h2></div>
+
+    <div class="flow">
+      <div class="tag">REGISTER</div>
+      <h3>Sign up &amp; social login</h3>
+      <div class="file">app/Livewire/RegisterAndLogin/Register.php</div>
+      <ul>
+        <li>Validates <b>username, mobile, unique email, password</b> (confirmed, min&nbsp;8).</li>
+        <li>Stores a <code>bcrypt</code> password, sets <b>role_id&nbsp;=&nbsp;2</b>, <b>active&nbsp;=&nbsp;1</b>, then <b>auto-logs the user in</b> and emails a welcome template.</li>
+        <li><code>check_mobile_number()</code> pre-checks mobile uniqueness during signup.</li>
+        <li><b>Google &amp; Facebook</b> via Laravel Socialite — existing email logs in, otherwise a new <code>role_id&nbsp;=&nbsp;2</code> account is created.</li>
+      </ul>
+    </div>
+
+    <div class="flow">
+      <div class="tag">LOGIN</div>
+      <h3>Mobile + password sign in</h3>
+      <div class="file">app/Livewire/RegisterAndLogin/Login.php · login.blade.php</div>
+      <ul>
+        <li>Form binds <code>mobile</code> + <code>password</code> and submits via <code>wire:submit="login"</code>.</li>
+        <li>Confirms the mobile exists, blocks accounts where <b><code>active != 1</code></b>, then calls <code>Auth::attempt()</code>.</li>
+        <li>On success, sends a login-notification email (device / time / timezone) and redirects to <code>/</code>.</li>
+        <li>In demo mode (<code>ALLOW_MODIFICATION == 0</code>) the form <b>pre-fills demo credentials</b>.</li>
+      </ul>
+    </div>
+
+    <div class="flow">
+      <div class="tag">OTP</div>
+      <h3>SMS one-time passcode</h3>
+      <div class="file">app/Http/Controllers/AuthController.php</div>
+      <ul>
+        <li><code>send_otp()</code> generates a 6-digit code, saves it to the <code>otps</code> table, and sends it via <code>send_sms()</code>.</li>
+        <li><code>verify_otp()</code> compares the code and flips <code>varified&nbsp;=&nbsp;1</code>.</li>
+      </ul>
+    </div>
+
+    <div class="flow">
+      <div class="tag">RESET</div>
+      <h3>Password recovery</h3>
+      <div class="file">app/Livewire/RegisterAndLogin/ForgetPassword.php</div>
+      <ul>
+        <li><code>check_number()</code> confirms the mobile belongs to a registered user.</li>
+        <li><code>new_password()</code> re-hashes and writes the new password, keyed on <b>mobile</b>.</li>
+      </ul>
+    </div>
+
+    <div class="flow">
+      <div class="tag">LOGOUT</div>
+      <h3>Ending the session</h3>
+      <div class="file">app/Http/Controllers/UserController.php</div>
+      <ul>
+        <li><code>logout()</code> returns JSON with a redirect; <code>Profilelogout()</code> redirects directly — both call <code>Auth::logout()</code>.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">03</span><h2>OTP verification method</h2></div>
+    <p class="sub" style="margin-bottom:1rem">Admin → <span class="path">System Settings → authentication_method</span> chooses <b>how the mobile number is verified with a one-time code</b> during <b>registration</b> and <b>password recovery</b> — it does not change the main login (mobile&nbsp;+&nbsp;password). The frontend reads a hidden field and branches:</p>
+    <div class="callout" style="margin-bottom:1.2rem">
+      <code>if (authentication_method == "firebase") FirebaseAuth();</code><br>
+      <code>else if (authentication_method == "sms") CustomSmsAuth();</code>
+    </div>
+
+    <div class="methods">
+      <div class="method hosted">
+        <span class="badge">Option 1 · firebase</span>
+        <h3>Firebase Authentication</h3>
+        <div class="who">OTP sent &amp; verified by Google</div>
+        <ul>
+          <li>Loads Firebase web config from <code>settings/get-firebase-credentials</code> (the <b>firebase_settings</b> saved in admin) and renders a <b>reCAPTCHA</b>.</li>
+          <li><b>Send</b> → <code>firebase.auth().signInWithPhoneNumber()</code> — Google's infrastructure delivers the SMS.</li>
+          <li><b>Verify</b> → <code>confirmationResult.confirm(code)</code> — checked client-side by Firebase.</li>
+          <li>Your <code>AuthController</code> and the <code>otps</code> table are <b>not used</b>.</li>
+        </ul>
+        <div class="foot"><b>Setup:</b> Firebase project with Phone auth, web API keys in admin, domain added to authorized domains. Google handles delivery, anti-abuse &amp; rate limits; SMS is billed by Google past the free tier.</div>
+      </div>
+
+      <div class="method">
+        <span class="badge">Option 2 · sms</span>
+        <h3>Custom SMS Gateway OTP</h3>
+        <div class="who">OTP generated &amp; verified on your server</div>
+        <ul>
+          <li><b>Send</b> → <code>POST auth/send_otp</code> → generates a 6-digit code, stores it in the <b><code>otps</code> table</b>, sends it through your gateway via <code>send_sms()</code>.</li>
+          <li><b>Verify</b> → <code>POST auth/verify_otp</code> → compares the code and flips <code>varified&nbsp;=&nbsp;1</code>.</li>
+          <li>Uses whatever provider you set in <b>SMS Gateway settings</b> (Twilio, MSG91, …).</li>
+        </ul>
+        <div class="foot"><b>Setup:</b> SMS gateway credentials in admin. You control sender ID, cost &amp; regional reach — but you own delivery reliability, expiry and abuse protection.</div>
+      </div>
+    </div>
+
+    <div class="finding crit" style="margin-bottom:0">
+      <div class="top"><span class="sev">Caveat</span><h3>The method is only a delivery channel — not enforcement</h3></div>
+      <p>In both modes the OTP is checked in the <b>browser</b>. In <code>sms</code> mode <code>verify_otp</code> only sets a flag that the reset flow never re-checks server-side; in <code>firebase</code> mode verification never touches your backend at all. A request sent straight to <code>/register/submit</code> or the password-reset endpoint bypasses either method. See finding 01 below.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Route protection</h2></div>
+    <p class="sub" style="margin-bottom:1rem">Defined in <span class="path">routes/front_end_routes.php</span>. Guest routes bounce logged-in users home via <code>RedirectIfAuthenticated</code>; the <code>auth</code> group gates everything account-related.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Route</th><th>Access</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td class="route">/login · /register</td><td><span class="gd guest">guest</span></td><td>Sign in &amp; sign up</td></tr>
+          <tr><td class="route">/password-recovery</td><td><span class="gd guest">guest</span></td><td>Reset password</td></tr>
+          <tr><td class="route">auth/google · auth/facebook</td><td><span class="gd guest">guest</span></td><td>Social OAuth</td></tr>
+          <tr><td class="route">auth/send_otp · verify_otp</td><td><span class="gd open">open</span></td><td>SMS verification</td></tr>
+          <tr><td class="route">/cart · /cart/checkout</td><td><span class="gd auth">auth</span></td><td>Cart &amp; checkout</td></tr>
+          <tr><td class="route">/orders · /orders/{id}</td><td><span class="gd auth">auth</span></td><td>Order history</td></tr>
+          <tr><td class="route">/my-account/*</td><td><span class="gd auth">auth</span></td><td>Profile, wallet, addresses, support</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="sec-num">05</span><h2>Security findings</h2></div>
+    <p class="sub" style="margin-bottom:1.1rem">Ranked most severe first. The first two are account-takeover risks and should be treated as blockers.</p>
+
+    <div class="finding crit">
+      <div class="top"><span class="sev">Critical</span><h3>Password reset has no server-side verification</h3></div>
+      <p><code>new_password()</code> updates any account's password given only a <b>mobile number</b> + new password. It never checks the OTP <code>varified</code> flag or any token — the OTP step is enforced only in the frontend. Anyone POSTing to <code>/password-recovery/set-new-password</code> can take over any account by phone number.</p>
+      <div class="fix"><b>Fix</b> Require a verified, unexpired <code>otps</code> record for that mobile before writing the password, then consume it.</div>
+    </div>
+
+    <div class="finding crit">
+      <div class="top"><span class="sev">Critical</span><h3>OTPs never expire and are reusable</h3></div>
+      <p><code>verify_otp()</code> has no expiry timestamp, no rate limiting, and never clears the code after use. A code stays valid indefinitely and can be replayed — which compounds the reset flaw above.</p>
+      <div class="fix"><b>Fix</b> Add a <code>created_at</code> expiry window, throttle send/verify attempts, and delete the row once consumed.</div>
+    </div>
+
+    <div class="finding warn">
+      <div class="top"><span class="sev">Warning</span><h3>Customer login is not role-scoped</h3></div>
+      <p><code>login()</code> authenticates any row in <code>users</code> by mobile + password without checking <code>role_id</code>. An admin or seller can authenticate through the customer form into the same <code>web</code> session, and vice versa.</p>
+      <div class="fix"><b>Fix</b> Scope <code>Auth::attempt()</code> to <code>role_id&nbsp;=&nbsp;2</code> on the storefront login, or gate privileged areas by role explicitly.</div>
+    </div>
+
+    <div class="finding info">
+      <div class="top"><span class="sev">Info</span><h3>Registration uses the framework base User model</h3></div>
+      <p>Register.php imports <code>Illuminate\Foundation\Auth\User</code> instead of <code>App\Models\User</code>, so <code>User::create()</code> bypasses the app model's <code>$fillable</code> and <code>$casts</code>. It works today (same table) but is fragile and inconsistent with the rest of the codebase.</p>
+      <div class="fix"><b>Fix</b> Import and use <code>App\Models\User</code> for all writes.</div>
+    </div>
+  </section>
+
+  <footer>
+    <span>ghs-storefront · customer-auth</span>
+    <span>generated by Claude Code</span>
+  </footer>
+
+</div>
+</div>

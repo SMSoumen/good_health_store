@@ -10,7 +10,7 @@
         ? 'https://wa.me/' . preg_replace('/\D+/', '', $settings->support_number)
         : '';
 @endphp
-<div class="footer ghs-footer">
+<div class="footer ghs-footer mt-5">
 
     {{-- ===================== GHS FOOTER MAIN (columns + mailing band merged) ===================== --}}
     <div class="ghs-footer-main">

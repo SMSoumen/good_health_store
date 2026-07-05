@@ -1,4 +1,4 @@
-<div wire:ignore.self class="offcanvas offcanvas-end" tabindex="-1" id="minicart-drawer">
+<div @if ($shell) wire:ignore.self class="offcanvas offcanvas-end" tabindex="-1" id="minicart-drawer" @else style="display: contents" @endif>
     @php
         use App\Models\Product;
         use App\Models\ComboProduct;

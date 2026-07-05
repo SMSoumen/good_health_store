@@ -171,7 +171,7 @@ $language_code = app(TranslationService::class)->getLanguageCode();
                     </div>
                     <input type="hidden" name="edit_address_id" id="edit_address_id" value="">
                     <div class="modal-footer justify-content-center">
-                        <button type="button" wire:click="save" class="btn btn-primary">
+                        <button type="button" class="btn btn-primary add_address">
                             <span>{{ labels('front_messages.add_address', 'Add Address') }}</span>
                         </button>
 

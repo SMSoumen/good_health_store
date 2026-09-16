@@ -5,10 +5,25 @@ use App\Services\MediaService;
 $img = !empty($user_info->image) && file_exists(public_path(config('constants.USER_IMG_PATH') . $user_info->image)) ? app(MediaService::class)->getImageUrl($user_info->image, '', '', 'image', 'USER_IMG_PATH') : app(MediaService::class)->getImageUrl('no-user-img.jpeg', '', '', 'image', 'NO_USER_IMAGE');
 // dd($cities);
 $language_code = app(TranslationService::class)->getLanguageCode();
-$city_detail = fetchDetails(City::class, ['id' => $user_info->city], ['id', 'name'])[0] ?? null;
+// users.city is not stored consistently: older rows hold the city id, while rows
+// written by this form hold City->name verbatim -- get_Cities() hands select2 the
+// raw translatable JSON ({"en":"Kolkata"}) as the option value. Resolve either
+// shape to the City row so the page can show the translated name instead of the
+// JSON blob.
+$city_raw = $user_info->city;
+$city_detail = null;
+if ($city_raw !== null && $city_raw !== '') {
+    $city_detail = is_numeric($city_raw)
+        ? fetchDetails(City::class, ['id' => $city_raw], ['id', 'name'])[0] ?? null
+        : fetchDetails(City::class, ['name' => $city_raw], ['id', 'name'])[0] ?? null;
+}
 $city_id = $city_detail->id ?? '';
-$city_details = app(TranslationService::class)->getDynamicTranslation(City::class, 'name', $city_id, $language_code);
-// dd($city_details);
+$city_details = $city_id
+    ? app(TranslationService::class)->getDynamicTranslation(City::class, 'name', $city_id, $language_code)
+    : '';
+// Keep the preselected option's *value* in the shape get_Cities() emits, so
+// saving without touching the city posts exactly what it posts today.
+$city_option_value = $city_detail->name ?? $city_raw;
 foreach ($cities as $key => $city) {
     $city_name[$key] = $city->name;
 }
@@ -133,8 +148,10 @@ $bread_crumb['page_main_bread_crumb'] = labels('front_messages.profile', 'Profil
                                                             <span class="required">*</span></label>
                                                         <select class="col-md-12 form-control city_list" id="city_list"
                                                             name="edit-city">
-                                                            @if ($user_info['city'] != null)
-                                                                <option selected="selected">{{ $user_info['city'] }}
+                                                            @if (!empty($city_option_value))
+                                                                <option value="{{ $city_option_value }}"
+                                                                    selected="selected">
+                                                                    {{ $city_details ?: $city_option_value }}
                                                                 </option>
                                                             @endif
                                                         </select>

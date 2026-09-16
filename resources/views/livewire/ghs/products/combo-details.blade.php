@@ -113,6 +113,9 @@
                                 {{ $special_price }}
                             </span>
                         </div>
+                        @if (!empty($product_details->is_prices_inclusive_tax) && $product_details->is_prices_inclusive_tax == 1)
+                            <small class="tax-inclusive-note text-muted d-block mb-1">({{ labels('front_messages.price_including_tax', 'Price including tax') }})</small>
+                        @endif
 
                         <div class="mb-10px text-muted">{{ $product_details->short_description }}</div>
                         <hr class="light-hr" />
@@ -260,7 +263,7 @@
                         <a class="cursor-pointer text-link add-favorite {{ $product_details->is_favorite == 0 ? 'd-flex' : 'd-none' }}"
                             data-product-id="{{ $product_details->id }}" data-product-type="combo"><i
                                 class="hdr-icon icon anm anm-heart-l fs-6 me-2"></i><span>{{ labels('front_messages.add_to_wishlist', 'Add to Wishlist') }}</span></a>
-                        <a class="text-link add-compare" data-product-id="{{ $product_details->id }}"
+                        <a class="text-link add-compare" style="display:none;" data-product-id="{{ $product_details->id }}"
                             data-product-variant-id=""><i class="icon anm anm-random-r fs-6 me-2"></i>
                             <span>{{ labels('front_messages.add_to_compare', 'Add to Compare') }}</span></a>
                     </p>

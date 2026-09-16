@@ -157,7 +157,7 @@
                 <form enctype="multipart/form-data" method="POST" class="submit_form">
                     @method('PUT')
                     @csrf
-                    <input type="hidden" id="edit_tax_id" name="edit_tax_id">
+                    <input type="hidden" class="edit_ticket_type_id" name="edit_ticket_type_id">
                     <div class="modal-body">
                         <div class="form-group">
                             <label for="title">{{ labels('admin_labels.title', 'Title') }}</label>

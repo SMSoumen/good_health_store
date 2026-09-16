@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Models\CustomMessage;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Models\TicketType;
@@ -10,6 +11,7 @@ use App\Models\UserFcm;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
 use SplFileInfo;
 use Validator;
 use App\Traits\HandlesValidation;
@@ -522,8 +524,7 @@ class TicketController extends Controller
                     'ticket_id' => $ticket_id,
                 );
 
-                $registrationIDs_chunks = array_chunk($fcm_ids, 1000);
-                app(FirebaseNotificationService::class)->sendNotification('', $registrationIDs_chunks, $fcmMsg);
+                $this->pushToCustomer($fcm_ids, $fcmMsg);
             }
 
             $type = config('eshop_pro.type');
@@ -586,19 +587,18 @@ class TicketController extends Controller
         $settings = app(SettingService::class)->getSettings('system_settings', true);
         $settings = json_decode($settings, true);
         $app_name = isset($settings['app_name']) && !empty($settings['app_name']) ? $settings['app_name'] : '';
-        $customer_res = fetchDetails('users', ['id' => $customer_id], ['username', 'fcm_id']);
+        $customer_res = fetchDetails(User::class, ['id' => $customer_id], ['username', 'fcm_id']);
         $fcm_ids = array();
 
-        $custom_notification = fetchDetails('custom_messages', ['type' => "ticket_status"], '*');
-        $customer_res[0]->username = isset($customer_res[0]->username) ? $customer_res[0]->username : '';
+        $custom_notification = fetchDetails(CustomMessage::class, ['type' => "ticket_status"], '*');
 
         $hashtag_application_name = '< application_name >';
-        $string = isset($custom_notification) && !empty($custom_notification) ? json_encode($custom_notification[0]->message, JSON_UNESCAPED_UNICODE) : '';
+        $string = !$custom_notification->isEmpty() ? json_encode($custom_notification[0]->message, JSON_UNESCAPED_UNICODE) : '';
         $hashtag = html_entity_decode($string);
         $data1 = str_replace(array($hashtag_application_name), array($app_name), $hashtag);
         $message = outputEscaping(trim($data1, '"'));
 
-        $customer_msg = (!empty($custom_notification)) ? $message : 'Your Support Ticket Status has been updated please noted it. Regards ' . $app_name . '';
+        $customer_msg = !$custom_notification->isEmpty() ? $message : 'Your Support Ticket Status has been updated please noted it. Regards ' . $app_name . '';
 
 
         $customer_result = UserFcm::with('user:id,id,is_notification_on')
@@ -618,7 +618,7 @@ class TicketController extends Controller
             $fcm_ids[] = $result['fcm_id'];
         }
 
-        $title = (!empty($custom_notification)) ? $custom_notification[0]->title : "Order status updated";
+        $title = !$custom_notification->isEmpty() ? $custom_notification[0]->title : "Order status updated";
         $fcmMsg = array(
             'title' => (string) $title,
             'body' => (string) $customer_msg,
@@ -626,8 +626,7 @@ class TicketController extends Controller
             'ticket_id' => $ticket_id,
         );
 
-        $registrationIDs_chunks = array_chunk($fcm_ids, 1000);
-        app(FirebaseNotificationService::class)->sendNotification('', $registrationIDs_chunks, $fcmMsg);
+        $this->pushToCustomer($fcm_ids, $fcmMsg);
 
         return response()->json([
             'error' => false,
@@ -635,6 +634,29 @@ class TicketController extends Controller
             labels('admin_labels.ticket_updated_successfully', 'Ticket updated successfully'),
             'data' => $ticket
         ]);
+    }
+
+    /**
+     * Fire-and-forget push to the ticket's customer.
+     *
+     * The ticket write has already been committed by the time this runs, so a
+     * push failure (most commonly Firebase not being configured at all) must
+     * not turn a successful request into an error response.
+     */
+    private function pushToCustomer(array $fcm_ids, array $fcmMsg): void
+    {
+        $fcm_ids = array_filter($fcm_ids);
+
+        if (empty($fcm_ids)) {
+            return;
+        }
+
+        try {
+            app(FirebaseNotificationService::class)
+                ->sendNotification('', array_chunk($fcm_ids, 1000), $fcmMsg);
+        } catch (\Throwable $e) {
+            Log::warning('Ticket push notification skipped: ' . $e->getMessage());
+        }
     }
     public function delete_selected_data(Request $request)
     {

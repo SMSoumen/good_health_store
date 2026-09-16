@@ -454,38 +454,41 @@
     @endif
 
     {{-- BRANDS --}}
-    @if (!empty($brands['brands']))
-        <section class="section collection-slider">
-            <div class="container-fluid">
-                <div class="section-header style2 d-flex justify-content-between">
-                    <div>
-                        <h2>{{ labels('front_messages.popular_brands', 'Popular Brands') }}</h2>
-                        <p>{{ labels('front_messages.explore_brands', 'Explore top picks in our Brands!') }}</p>
+    @if(2<1)
+        @if (!empty($brands['brands']))
+            <section class="section collection-slider">
+                <div class="container-fluid">
+                    <div class="section-header style2 d-flex justify-content-between">
+                        <div>
+                            <h2>{{ labels('front_messages.popular_brands', 'Popular Brands') }}</h2>
+                            <p>{{ labels('front_messages.explore_brands', 'Explore top picks in our Brands!') }}</p>
+                        </div>
+                        <a wire:navigate href="{{ customUrl('brands') }}" class="view_more_icon">
+                            <i class="anm anm-arrow-alt-right"></i>
+                        </a>
                     </div>
-                    <a wire:navigate href="{{ customUrl('brands') }}" class="view_more_icon">
-                        <i class="anm anm-arrow-alt-right"></i>
-                    </a>
-                </div>
 
-                <div class="swiper category-mySwiper">
-                    <div class="swiper-wrapper">
-                        @foreach ($brands['brands'] as $brand)
-                            <div class="swiper-slide slider-brand rounded-4">
-                                <a wire:navigate href="{{ customUrl('products/?brand=' . $brand['brand_slug']) }}"
-                                    class="brand-box">
-                                    <img class="blur-up lazyload" src="{{ $brand['brand_img'] }}"
-                                        data-src="{{ $brand['brand_img'] }}" alt="{{ $brand['brand_name'] }}">
-                                    @if (($store_settings['brand_style'] ?? '') === 'brands_style_1')
-                                        <h4 class="text-center">{{ $brand['brand_name'] }}</h4>
-                                    @endif
-                                </a>
-                            </div>
-                        @endforeach
+                    <div class="swiper category-mySwiper">
+                        <div class="swiper-wrapper">
+                            @foreach ($brands['brands'] as $brand)
+                                <div class="swiper-slide slider-brand rounded-4">
+                                    <a wire:navigate href="{{ customUrl('products/?brand=' . $brand['brand_slug']) }}"
+                                        class="brand-box">
+                                        <img class="blur-up lazyload" src="{{ $brand['brand_img'] }}"
+                                            data-src="{{ $brand['brand_img'] }}" alt="{{ $brand['brand_name'] }}">
+                                        @if (($store_settings['brand_style'] ?? '') === 'brands_style_1')
+                                            <h4 class="text-center">{{ $brand['brand_name'] }}</h4>
+                                        @endif
+                                    </a>
+                                </div>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        @endif
     @endif
+
 
     {{-- PRODUCT SECTIONS --}}
     @foreach ($sections as $row)

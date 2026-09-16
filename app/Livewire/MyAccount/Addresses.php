@@ -80,7 +80,10 @@ class Addresses extends Component
         
         // Get existing address if updating
         if (isset($request->address_id) && !empty($request->address_id)) {
-            $existingAddress = Address::find($request->address_id);
+            // Scoped by user_id so one customer cannot update another's address.
+            $existingAddress = Address::where('id', $request->address_id)
+                ->where('user_id', $user_id)
+                ->first();
         }
 
         // Fetch city_id based on the selected city name
@@ -110,12 +113,35 @@ class Addresses extends Component
         if ($countryName === 'false' || empty($countryName)) {
             $country_code = $existingAddress->country_code ?? null;
             $country = $existingAddress->country ?? null;
+            // `country` is read straight off the request below, so the retained
+            // value has to be written back -- otherwise the literal string
+            // "false" the select2 posts is what lands in the column.
+            $request['country'] = $country;
         } else {
             $country = DB::table('countries')
                 ->select('*')
                 ->where('name', $countryName)
                 ->first();
             $country_code = $country ? $country->phonecode : null;
+        }
+
+        // The city/country select2s post the literal string "false" when nothing
+        // is picked, which satisfies `required` but resolves to null here. On the
+        // create path there is no existing address to fall back on, so that
+        // reached the DB as a null `city` and blew up as a 500 instead of
+        // telling the customer what was wrong.
+        $selection_errors = [];
+        if (empty($city_name)) {
+            $selection_errors['city_name'] = ['Please select a city.'];
+        }
+        if (empty($request['country']) || $request['country'] === 'false') {
+            $selection_errors['country'] = ['Please select a country.'];
+        }
+        if (!empty($selection_errors)) {
+            return [
+                'error' => true,
+                'message' => $selection_errors,
+            ];
         }
 
         // Add city_id and country_code to address data
@@ -165,8 +191,15 @@ class Addresses extends Component
                 $address_data['country_code'] = $existingAddress->country_code;
             }
 
-            $res = updateDetails($address_data, ['id' => $address_id], Address::class);
-            if (!$res) {
+            // Ownership is verified above, so a zero-row result here just means
+            // nothing actually changed -- MySQL reports rows *changed*, not
+            // matched, so resubmitting the form untouched would otherwise be
+            // reported to the customer as a failure.
+            try {
+                Address::where('id', $address_id)
+                    ->where('user_id', $user_id)
+                    ->update($address_data);
+            } catch (\Exception $e) {
                 return [
                     'error' => true,
                     'message' => 'Failed to update address. Please try again.'
@@ -201,7 +234,21 @@ class Addresses extends Component
     public function edit_address(Request $request)
     {
         $addressId = $request->input('address_id');
-        $address_data = Address::find($addressId);
+
+        // Scope to the signed-in user. This endpoint is routed and reachable
+        // directly, so an unscoped find() would hand any customer's name,
+        // phone number and address to any logged-in visitor.
+        $address_data = Address::where('id', $addressId)
+            ->where('user_id', Auth::id())
+            ->first();
+
+        if (!$address_data) {
+            return response()->json([
+                'error' => true,
+                'message' => 'Address not found.',
+            ], 404);
+        }
+
         return $address_data;
     }
 

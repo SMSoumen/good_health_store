@@ -18,7 +18,8 @@ $language_code = app(TranslationService::class)->getLanguageCode();
                             <div class="address-card mt-0 h-100">
                                 <div class="top-sec d-flex-justify-center justify-content-between mb-4">
                                     <h2 class="mb-0">{{ labels('front_messages.address_book', 'Address Book') }}</h2>
-                                    <button type="button" wire:click="resetForm" class="btn btn-primary btn-sm"
+                                    <button type="button" wire:click="resetForm"
+                                        class="btn btn-primary btn-sm add-new-address-btn"
                                         data-bs-toggle="modal" data-bs-target="#addNewModal">
                                         <ion-icon name="add-outline" class="me-1 fs-5"></ion-icon>
                                         {{ labels('front_messages.add_new', 'Add New') }}
@@ -72,8 +73,9 @@ $language_code = app(TranslationService::class)->getLanguageCode();
                                                         </div>
                                                     </div>
                                                     <div class="bottom d-flex-justify-center justify-content-between">
-                                                        <button type="button" wire:click="edit({{ $address['id'] }})"
-                                                            class="bottom-btn btn btn-gray btn-sm"
+                                                        <button type="button"
+                                                            class="bottom-btn btn btn-gray btn-sm edit-address-btn"
+                                                            data-address-id="{{ $address['id'] }}"
                                                             data-bs-toggle="modal" data-bs-target="#addNewModal">
                                                             {{ labels('front_messages.edit', 'Edit') }}
                                                         </button>
